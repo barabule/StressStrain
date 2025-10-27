@@ -41,13 +41,13 @@ function engineering_to_true(SS::EngineeringStressStrain)
 end
 
 
-function true_to_engineering(SS:TrueStressStrain)
+function true_to_engineering(SS::TrueStressStrain)
     strain = exp.(SS.strain) .- 1
     stress = SS.stress ./ (1 .+ strain)
     return EngineeringStressStrain(strain, stress)
 end
 
-
+####interface for AbstractArray
 
 function length(SS::AbstractStressStrainSignal)
     SS.length
@@ -59,21 +59,21 @@ end
 
 
 function getindex(SS::AbstractStressStrainSignal, i)
+    @assert 1<=i<=SS.length "Error index must be between 1 and $(SS.length)!"
     (SS.strain[i], SS.stress[i])
 end
 
+firstindex(SS::AbstractStressStrainSignal) = (SS.strain[1], SS.stress[1])
+lastindex(SS::AbstractStressStrainSignal) = (SS.strain[SS.length], SS.stress[SS.length])
 
 
-function nose(SS::AbstractStressStrainSignal)
 
 
-end
-
-
-function modulus(SS::AbstractStressStrainSignal; max_strain = 1e-3)
+function modulus(SS::AbstractStressStrainSignal; max_strain = 1e-3, sigdigits = 2)
     idx = findall(s -> s<= max_strain, SS.strain)
     if !isempty(idx)
-        return SS.stress[idx] ./ SS.strain[idx]
+        E = round(SS.stress[idx] \ SS.strain[idx]; sigdigits)
+        return E
     end
     nothing
 end
