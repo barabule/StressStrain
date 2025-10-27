@@ -47,7 +47,7 @@ function true_to_engineering(SS:TrueStressStrain)
     return EngineeringStressStrain(strain, stress)
 end
 
-import Base:getindex, length, size
+
 
 function length(SS::AbstractStressStrainSignal)
     SS.length
