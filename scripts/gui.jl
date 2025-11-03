@@ -51,12 +51,14 @@ function make_gui()
         
         f1 = first(files)
         println(f1)
-        data = try_open(f1)
-        if isnothing(data)
-            println("Data is nothing!")
-        else
-            plot_stress!(axss, SSE, interpolant)
-        end
+        SSE = try_open(f1)
+        
+        plot_stress!(axss, SSE, interpolant)
+        # if isnothing(data)
+        #     println("Data is nothing!")
+        # else
+        #     plot_stress!(axss, SSE, interpolant)
+        # end
     end
 
 
@@ -69,16 +71,20 @@ end
 function try_open(fn::AbstractString,
                     skipstart = 0)
 
-    delims = [',','\t',';']
 
-    for delim in delims
-        rawdata = readdlm(fn, delim;skipstart)
-        size(rawdata, 2) >= 2 || continue
-        isa(rawdata[1, 1], Number) && isa(rawdata[1,2], Number) && continue
-        return (;strain = rawdata[:,1], 
-                stress = rawdata[:, 2])
-    end
-    return nothing
+    rawdata = readdlm(fn)
+    return (;strain = rawdata[:,1],
+            stress = rawdata[:, 2])
+    # delims = [',','\t',';']
+
+    # for delim in delims
+    #     rawdata = readdlm(fn, delim;skipstart)
+    #     size(rawdata, 2) >= 2 || continue
+    #     isa(rawdata[1, 1], Number) && isa(rawdata[1,2], Number) && continue
+    #     return (;strain = rawdata[:,1], 
+    #             stress = rawdata[:, 2])
+    # end
+    # return nothing
 end
 
 function plot_stress!(ax, data, interpolant; N = 100)
