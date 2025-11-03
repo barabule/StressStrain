@@ -47,33 +47,36 @@ function true_to_engineering(SS::TrueStressStrain)
     return EngineeringStressStrain(strain, stress)
 end
 
-####interface for AbstractArray
-
-function length(SS::AbstractStressStrainSignal)
-    SS.length
-end
-
-function size(SS::AbstractStressStrainSignal)
-    (SS.length)
-end
-
-
-function getindex(SS::AbstractStressStrainSignal, i)
-    @assert 1<=i<=SS.length "Error index must be between 1 and $(SS.length)!"
-    (SS.strain[i], SS.stress[i])
-end
-
-firstindex(SS::AbstractStressStrainSignal) = (SS.strain[1], SS.stress[1])
-lastindex(SS::AbstractStressStrainSignal) = (SS.strain[SS.length], SS.stress[SS.length])
 
 
 
-
-function modulus(SS::AbstractStressStrainSignal; max_strain = 1e-3, sigdigits = 2)
+function get_modulus(SS::AbstractStressStrainSignal; max_strain = 1e-3, sigdigits = 2)
+    
+    N = SS.length
+    N >= 2 || error("Stress Strain data needs to have at least 2 points!")
     idx = findall(s -> s<= max_strain, SS.strain)
     if !isempty(idx)
         E = round(SS.stress[idx] \ SS.strain[idx]; sigdigits)
         return E
     end
-    nothing
+    E = (SS.stress[2] - SS.stress[1]) / ( SS.strain[2] - SS.strain[1]) #fallback
+end
+
+function get_hardening_portion(SS::TrueStressStrain, modulus = nothing;offset = 2e-3)
+    if isnothing(modulus)
+        E = get_modulus(SS)
+    else
+        E = modulus
+    end
+
+    for i in 1:SS.length
+        ϵ, σ = SS.strain[i], SS.stress[i]
+        ϵel = σ / E
+        ϵpl = ϵ - ϵel
+        if ϵpl > offset
+            return TrueStressStrain(SS.strain[i:end], SS.stress[i:end])
+        end
+        
+    end
+    return nothing
 end
