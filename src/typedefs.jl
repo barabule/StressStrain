@@ -1,6 +1,6 @@
 
 
-abstract type AbstractStressStrainSignal<:AbstractVector end
+abstract type AbstractStressStrainSignal end
 
 
 struct EngineeringStressStrain{T<:Real} <: AbstractStressStrainSignal
@@ -20,7 +20,7 @@ end
 
 struct TrueStressStrain{T<:Real} <:AbstractStressStrainSignal
     strain::Vector{T}
-    stress:Vector{T}
+    stress::Vector{T}
     length::Integer
     function TruetressStrain(strain::AbstractVector, stress::AbstractVector)
         T1 = eltype(strain)
