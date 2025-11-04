@@ -1,52 +1,5 @@
 
 
-# abstract type AbstractStressStrainSignal end
-
-
-# struct EngineeringStressStrain{T<:Real, I1<:Integer} <: AbstractStressStrainSignal
-#     strain::Vector{T}
-#     stress::Vector{T}
-#     length::Integer
-#     function EngineeringStressStrain(strain::AbstractVector, stress::AbstractVector, L)
-#         T1 = eltype(strain)
-#         T2 = eltype(stress)
-#         T = promote_type(T1, T2)
-#         I1 = typeof(L)
-#         N1 = length(strain)
-#         N2 = length(stress)
-#         @assert N1 == N2 == L "Strain and Stress must have the same length!"
-#         return new{T, I1}(T.(strain), T.(stress), L)
-#     end
-# end
-
-# struct TrueStressStrain{T<:Real, I1<:Integer} <:AbstractStressStrainSignal
-#     strain::Vector{T}
-#     stress::Vector{T}
-#     length::Integer
-#     function TruetressStrain(strain::AbstractVector, stress::AbstractVector, L)
-#         T1 = eltype(strain)
-#         T2 = eltype(stress)
-#         T = promote_type(T1, T2)
-#         I1 = typeof(L)
-#         N1 = length(strain)
-#         N2 = length(stress)
-#         @assert N1 == N2 ==L "Strain and Stress must have the same length!"
-#         return new{T, I1}(T.(strain), T.(stress), L)
-#     end
-# end
-
-# function TrueStressStrain(v1::Vector{T}, v2::Vector{T}) where T
-#     N = length(v1)
-#     @assert N == length(v2) "Lengths of v1 and v2 must be the same"
-#     return TrueStressStrain(v1, v2, N)
-# end
-
-# function EngineeringStressStrain(v1::Vector{T}, v2::Vector{T}) where T
-#     N = length(v1)
-#     @assert N == length(v2) "Lengths of v1 and v2 must be the same"
-#     return EngineeringStressStrain(v1, v2, N)
-# end
-
 
 function engineering_to_true(SS)
     logstrain = log.(1 .+ SS.strain)
