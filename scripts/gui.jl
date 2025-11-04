@@ -212,7 +212,7 @@ function get_interpolant(func, data)
         lb = zeros(5)
         ub = fill(Inf, 5)
         return Curvefit(data.stress, data.strain, func, p0, NelderMead(), true, lb, ub; extrapolate = true)
-    elseif func == LinearInterpolation || func == CubicSpline
+    elseif func == LinearInterpolation || func == CubicSpline || func == PCHIPInterpolation
         return func(data.stress, data.strain; extrapolation = ExtrapolationType.Linear)
     elseif func == BSplineApprox
         return func(data.stress, data.strain, 3, 4, :ArcLen, :Average; extrapolation = ExtrapolationType.Linear)
@@ -263,7 +263,8 @@ function initialize()
 
     fitfuncs = [LinearInterpolation, 
                 CubicSpline,
-                BSplineApprox, 
+                BSplineApprox,
+                PCHIPInterpolation,
                 SS.Swift, 
                 SS.Voce, 
                 SS.HockettSherby, 
@@ -272,6 +273,7 @@ function initialize()
     fitfunclabels = ["Linear", 
                     "CSplines", 
                     "BSplineApprox",
+                    "PCHIPInterpolation",
                     "Swift", 
                     "Voce", 
                     "HockettSherby",

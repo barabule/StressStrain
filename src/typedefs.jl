@@ -21,7 +21,7 @@ end
 
 
 function get_modulus(SS; max_strain = 1e-3, sigdigits = 2)
-    
+    @assert haskey(SS, :strain) && haskey(SS, :stress) "SS must have fields strain and stress !"
     N = length(SS.strain)
     N >= 2 || error("Stress Strain data needs to have at least 2 points!")
     idx = findall(s -> s<= max_strain, SS.strain)
