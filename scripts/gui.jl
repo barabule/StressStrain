@@ -164,17 +164,22 @@ function plot_stress!(ax, SSE; N = 100, tmax = SSE["export max strain"])
     empty!(ax)
     #true stress
     tss = SSE["true stress"]
-    scatter!(ax, tss.strain, tss.stress, 
-                    label = "True Stress (Exp)",
-                    color = :black, marker = :cross, alpha = 0.3)
-    lines!(ax, tss.strain, tss.stress, 
-                    label = "True Stress (Exp)",
-                    color = :black, linewidth = 0.5)
+    # scatter!(ax, tss.strain, tss.stress, 
+    #                 label = "True Stress (Exp)",
+    #                 color = :black, marker = :cross, alpha = 0.3)
+    # lines!(ax, tss.strain, tss.stress, 
+    #                 label = "True Stress (Exp)",
+    #                 color = :black, linewidth = 0.5)
+    scatterlines!(ax, tss.strain, tss.stress,
+                    label= "True Stress (Exp)",
+                        color = :black, marker = '◉', alpha = 0.3, 
+                        markercolor = :black, 
+                        markersize = 20)
     t = LinRange(0, tmax, N)
     hss = SSE["hardening"]
     scatter!(ax, hss.strain, hss.stress, 
                 label = "Hardening Portion (Exp)",
-                color = :red, marker = :cross, alpha = 0.3)
+                color = :red, marker = '◉', alpha = 0.3, markersize = 20)
 
     lines!(ax, t , SSE["hardening fit"](t), color = :black, label = "Hardening Law (Fit)", linewidth = 2.0)
     
