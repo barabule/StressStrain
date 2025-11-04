@@ -8,7 +8,9 @@ using Optim
 
 
 
-function make_gui(; N=1000)
+function make_gui(; 
+                N=1000,
+                sidebar_width = 300)
 
     fig = Figure()
     
@@ -28,7 +30,7 @@ function make_gui(; N=1000)
     
 
     # sliderobservables = [s.value for s in sg.sliders]
-    gl = GridLayout(fig[1,2], width = 300, tellheight = false)
+    gl = GridLayout(fig[1,2], width = sidebar_width, tellheight = false)
 
     gl_bot = GridLayout(fig[2, :], height = 100, tellwidth = false)
 
@@ -50,9 +52,18 @@ function make_gui(; N=1000)
 
     Label(subgl1[5,:], "Material Name")
     tb_name = Textbox(subgl1[6,:], 
-             width = 300)
+             width = sidebar_width)
 
 
+    sldvals = initialize_slider(SSE)
+    sld_modulus = Slider(subgl1[8, :], 
+                    range = LinRange(sldvals.vmin, sldvals.vmax, 1001),
+                    startvalue= sldvals.value,
+                    update_while_dragging =true,
+                    width = sidebar_width,
+                    )
+
+    lab_modulus = Label(subgl1[7, :], "E = $(round(sld_modulus.value[]; sigdigits= 3))MPa")
 
     subgl2[1,1] = vgrid!(
             Label(fig, "Fitting Function", width = nothing),
@@ -61,6 +72,9 @@ function make_gui(; N=1000)
             ;
             tellheight = false, width = 200,
     )    
+
+
+
 
     ####################EVENTS########################################################################        
     on(cb_true.checked) do val
@@ -72,7 +86,11 @@ function make_gui(; N=1000)
     end
 
     
-
+    on(sld_modulus.value) do val
+        update_SSE!(SSE, nothing; modulus = round(val; sigdigits =3))
+        plot_stress!(axss, SSE; N)
+        lab_modulus.text = "E = $(round(sld_modulus.value[]; sigdigits= 3))MPa"
+    end
     
 
 
@@ -87,6 +105,9 @@ function make_gui(; N=1000)
         plot_stress!(axss, SSE; N)
     end
 
+
+
+
     on(events(fig).dropped_files) do files
         isempty(files) && return nothing
         
@@ -95,12 +116,17 @@ function make_gui(; N=1000)
         data = try_open(f1)
         
         update_SSE!(SSE, data)
+        
+        sldvals = initialize_slider(SSE)
+        sld_modulus.range = LinRange(sldvals.vmin, sldvals.vmax, 1001)
+        _ = set_close_to!(sld_modulus, sldvals.value)
+
         plot_stress!(axss, SSE; N)
         
     end
 
     on(tb_extrapolation_strain.stored_string) do s
-        SSE["export max strain"] = clamp(parse(Float64, s), 0.0, Inf)
+        SSE["export max strain"] = clamp(parse(Float64, s), last(SSE["hardening"].strain), Inf)
         plot_stress!(axss, SSE; N)
     end
 
@@ -152,6 +178,15 @@ function plot_stress!(ax, SSE; N = 100, tmax = SSE["export max strain"])
 
     lines!(ax, t , SSE["hardening fit"](t), color = :black, label = "Hardening Law (Fit)", linewidth = 2.0)
     
+    #plot the linear portion
+    E = SSE["modulus"]
+    smax = maximum(SSE["hardening"].stress)
+    tmax = smax / E
+    tlin = LinRange(0, tmax, 10)
+    slin = E .* tlin
+    lines!(ax, tlin, slin, linestyle = :dash, color = :red)
+
+
     return nothing
 end
 
@@ -245,7 +280,7 @@ function initialize()
 end
 
 
-function update_SSE!(SSE, data = nothing)
+function update_SSE!(SSE, data = nothing; modulus = nothing)
     
     if !isnothing(data)
         SSE["rawdata"] = (;strain = data.strain,
@@ -255,7 +290,7 @@ function update_SSE!(SSE, data = nothing)
     
     SSE["true stress"] = SSE["is true"] ? SSE["rawdata"] : SS.engineering_to_true(SSE["rawdata"])
 
-    SSE["modulus"] = SS.get_modulus(SSE["true stress"])
+    SSE["modulus"] = isnothing(modulus) ? SS.get_modulus(SSE["true stress"]) : modulus
     SSE["hardening"] = SS.get_hardening_portion(SSE["true stress"], 
                                                 SSE["modulus"]; 
                                                 offset = SSE["hardening offset"]
@@ -282,4 +317,16 @@ end
 function export_data(SSE)
     
 
+end
+
+function min_slope(SSE)
+    ss = SSE["true stress"]
+    return last(ss.stress) / last(ss.strain)
+end
+
+function initialize_slider(SSE)
+    E = SSE["modulus"]
+    Emin = round(min_slope(SSE); sigdigits =3)
+    Emax = round(5 * E; sigdigits = 3)
+    return (;value = E, vmin = Emin, vmax = Emax)
 end
