@@ -33,5 +33,6 @@ end
 function Hollomon(t ,p)
     @assert length(p)>=2 "p must have at least 2 elements!"
     K, n = p[1:2]
-    return @. K * t ^ n
+    return @. K * abs(t) ^ n
 end
+
