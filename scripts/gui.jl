@@ -30,13 +30,39 @@ function make_gui(; N=1000)
     # sliderobservables = [s.value for s in sg.sliders]
     gl = GridLayout(fig[1,2], width = 300, tellheight = false)
 
+    gl_bot = GridLayout(fig[2, :], height = 100, tellwidth = false)
+
     subgl1 = GridLayout(gl[1,1])
+    subgl2 = GridLayout(gl[2,1])
 
-    cb_true = Checkbox(subgl1[1,1], checked = false, 
-                            # onchange = v-> change_true_status!(v, SSE),
+    cb_true = Checkbox(subgl1[1,2], checked = false, 
                             )
-    lab_true = Label(subgl1[1,1], "True", halign = :left)
+    Label(subgl1[1,1], "True", halign = :left)
 
+
+    Label(subgl1[2,:], "Extrapolation Strain", width = nothing)       
+    
+    tb_extrapolation_strain = Textbox(subgl1[3,:], 
+            validator = Float64,
+            )
+
+
+
+    Label(subgl1[5,:], "Material Name")
+    tb_name = Textbox(subgl1[6,:], 
+             width = 300)
+
+
+
+    subgl2[1,1] = vgrid!(
+            Label(fig, "Fitting Function", width = nothing),
+            fit_menu,
+            # (Label("True", alignmode = :right), Checkbox(checked = false)),
+            ;
+            tellheight = false, width = 200,
+    )    
+
+    ####################EVENTS########################################################################        
     on(cb_true.checked) do val
         SSE["is true"] = val
         update_SSE!(SSE)
@@ -45,18 +71,11 @@ function make_gui(; N=1000)
         axss.ylabel = val ? "True Stress [MPa]" : "Engineering Stress [MPa]"
     end
 
-    tb_extrapolation_strain = Textbox(fig, 
-            validator = Float64, tellwidth = false)
+    
 
-    subgl1[2,1] = vgrid!(
-            Label(fig, "Extrapolation Strain", width = nothing),
-            tb_extrapolation_strain,
-            Label(fig, "Fitting Function", width = nothing),
-            fit_menu,
-            # (Label("True", alignmode = :right), Checkbox(checked = false)),
-            ;
-            tellheight = false, width = 200,
-    )
+    
+
+
 
 
     on(fit_menu.selection) do s
@@ -85,8 +104,10 @@ function make_gui(; N=1000)
         plot_stress!(axss, SSE; N)
     end
 
-
-
+    on(tb_name.stored_string) do s
+        SSE["name"] = s
+        axss.title = s
+    end
 
     return fig
 
@@ -258,4 +279,7 @@ function change_true_status!(val::Bool, SSE)
     return !val
 end
 
-make_gui()
+function export_data(SSE)
+    
+
+end
