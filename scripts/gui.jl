@@ -6,49 +6,55 @@ using DataInterpolations
 using DelimitedFiles
 using Optim
 
+
+
 function make_gui(; N=1000)
 
     fig = Figure()
-    strain  = collect(LinRange(0, 1, 50))
-    SSE = (;strain = strain, 
-                    stress  = 100. * strain .^ 0.2)
+    
+    SSE, fitfuncs, fitfunclabels = initialize()
 
     axss = Axis(fig[1,1], title = "Stress Strain",
-                    xlabel = "Strain [-]",
-                    ylabel = "Stress [MPa]")
+                    xlabel = "Engineering Strain [-]",
+                    ylabel = "Engineering Stress [MPa]")
 
 
+    plot_stress!(axss, SSE; N)
+    axislegend(axss, position = :rb, merge = true)
+    fit_menu = Menu(fig, options = zip(fitfunclabels, fitfuncs),
+                    default = "Linear")
     
 
     
 
-    fitfuncs = [LinearInterpolation, 
-                CubicSpline,
-                BSplineApprox, 
-                SS.Swift, 
-                SS.Voce, 
-                SS.HockettSherby, 
-                SS.StoughtonYoon]
+    # sliderobservables = [s.value for s in sg.sliders]
+    gl = GridLayout(fig[1,2], width = 300, tellheight = false)
 
-    interpolant = fitfuncs[1](SSE.stress, SSE.strain)
-    
-    plot_stress!(axss, SSE, interpolant; N=1000)
+    subgl1 = GridLayout(gl[1,1])
 
+    cb_true = Checkbox(subgl1[1,1], checked = false, 
+                            # onchange = v-> change_true_status!(v, SSE),
+                            )
+    lab_true = Label(subgl1[1,1], "True", halign = :left)
 
-    fit_menu = Menu(fig, options = zip(["Linear", 
-                                        "CSplines", 
-                                        "BSplineApprox",
-                                        "Swift", 
-                                        "Voce", 
-                                        "HockettSherby",
-                                        "StoughtonYoon"], fitfuncs),
-                        default = "Linear")
+    on(cb_true.checked) do val
+        SSE["is true"] = val
+        update_SSE!(SSE)
+        plot_stress!(axss, SSE; N)
+        axss.xlabel = val ? "True Strain [-]" : "Engineering Strain [-]"
+        axss.ylabel = val ? "True Stress [MPa]" : "Engineering Stress [MPa]"
+    end
 
-    
+    tb_extrapolation_strain = Textbox(fig, 
+            validator = Float64, tellwidth = false)
 
-    fig[1,2] = vgrid!(
+    subgl1[2,1] = vgrid!(
+            Label(fig, "Extrapolation Strain", width = nothing),
+            tb_extrapolation_strain,
             Label(fig, "Fitting Function", width = nothing),
-            fit_menu;
+            fit_menu,
+            # (Label("True", alignmode = :right), Checkbox(checked = false)),
+            ;
             tellheight = false, width = 200,
     )
 
@@ -57,8 +63,9 @@ function make_gui(; N=1000)
         #fit the function on the data
 
         # interpolant = s(SSE.stress ,SSE.strain)
-        interpolant = get_interpolant(s, SSE)
-        plot_stress!(axss, SSE, interpolant; N)
+        SSE["interpolant"] = s
+        update_SSE!(SSE)
+        plot_stress!(axss, SSE; N)
     end
 
     on(events(fig).dropped_files) do files
@@ -66,15 +73,18 @@ function make_gui(; N=1000)
         
         f1 = first(files)
         println(f1)
-        SSE = try_open(f1)
+        data = try_open(f1)
         
-        plot_stress!(axss, SSE, interpolant;N)
-        # if isnothing(data)
-        #     println("Data is nothing!")
-        # else
-        #     plot_stress!(axss, SSE, interpolant)
-        # end
+        update_SSE!(SSE, data)
+        plot_stress!(axss, SSE; N)
+        
     end
+
+    on(tb_extrapolation_strain.stored_string) do s
+        SSE["export max strain"] = clamp(parse(Float64, s), 0.0, Inf)
+        plot_stress!(axss, SSE; N)
+    end
+
 
 
 
@@ -102,12 +112,25 @@ function try_open(fn::AbstractString,
     # return nothing
 end
 
-function plot_stress!(ax, data, interpolant; N = 100)
+function plot_stress!(ax, SSE; N = 100, tmax = SSE["export max strain"])
 
     empty!(ax)
-    scatter!(ax, data.strain, data.stress, color = :black, marker = :cross)
-    t = LinRange(extrema(data.strain)..., N)
-    lines!(ax, t , interpolant.(t), color = :black)
+    #true stress
+    tss = SSE["true stress"]
+    scatter!(ax, tss.strain, tss.stress, 
+                    label = "True Stress (Exp)",
+                    color = :black, marker = :cross, alpha = 0.3)
+    lines!(ax, tss.strain, tss.stress, 
+                    label = "True Stress (Exp)",
+                    color = :black, linewidth = 0.5)
+    t = LinRange(0, tmax, N)
+    hss = SSE["hardening"]
+    scatter!(ax, hss.strain, hss.stress, 
+                label = "Hardening Portion (Exp)",
+                color = :red, marker = :cross, alpha = 0.3)
+
+    lines!(ax, t , SSE["hardening fit"](t), color = :black, label = "Hardening Law (Fit)", linewidth = 2.0)
+    
     return nothing
 end
 
@@ -117,21 +140,122 @@ function get_interpolant(func, data)
         p0 = [100.0, 1e-3, 0.2]
         lb = zeros(3)
         ub = [Inf, Inf, Inf]
-        return Curvefit(data.stress, data.strain, func, p0, NelderMead(), true, lb, ub)
+        return Curvefit(data.stress, data.strain, func, p0, NelderMead(), true, lb, ub; extrapolate = true)
     elseif func == SS.HockettSherby
         p0 = [50.0, 100.0, 1.0, 0.3]
         lb = zeros(4)
         ub = fill(Inf, 4)
-        return Curvefit(data.stress, data.strain, func, p0, NelderMead(), true, lb, ub)
+        return Curvefit(data.stress, data.strain, func, p0, NelderMead(), true, lb, ub; extrapolate = true)
     elseif func == SS.StoughtonYoon
         p0 = [50.0, 100.0, 1.0, 1.0, 1e-5]
         lb = zeros(5)
         ub = fill(Inf, 5)
-        return Curvefit(data.stress, data.strain, func, p0, NelderMead(), true, lb, ub)
+        return Curvefit(data.stress, data.strain, func, p0, NelderMead(), true, lb, ub; extrapolate = true)
     elseif func == LinearInterpolation || func == CubicSpline
-        return func(data.stress, data.strain)
+        return func(data.stress, data.strain; extrapolation = ExtrapolationType.Linear)
     elseif func == BSplineApprox
-        return func(data.stress, data.strain, 3, 4, :ArcLen, :Average)
+        return func(data.stress, data.strain, 3, 4, :ArcLen, :Average; extrapolation = ExtrapolationType.Linear)
     end
     return nothing
 end
+
+
+
+# function get_initial_ss()
+#     strain = LinRange(0, 0.1, 10)
+#     stress = 100.0 .* strain .^ 0.2
+#     return (;strain, stress)
+# end
+
+
+function get_initial_SSE(strain, stress)
+
+    SSE = Dict{String, Any}(
+        "name" => "Material", 
+        "is true" => false,
+        "rawdata" => (;strain, stress),
+        "hardening offset" => 2e-3,
+        "export density"=> 100,
+        
+        )
+    
+    push!(SSE, "modulus" => SS.get_modulus(SSE["rawdata"]))
+    push!(SSE, "true stress" => SS.engineering_to_true(SSE["rawdata"]))
+    
+    push!(SSE, "hardening" => SS.get_hardening_portion(SSE["true stress"], 
+                                                       SSE["modulus"]; 
+                                                       offset = SSE["hardening offset"])
+        )
+
+    push!(SSE, "export max strain" => maximum(SSE["rawdata"].strain))
+
+
+    return SSE
+end
+
+
+function initialize()
+    strain = LinRange(0, 0.1, 20)
+    stress = 100.0 .* strain .^ 0.2
+    SSE = get_initial_SSE(strain ,stress)
+
+
+    fitfuncs = [LinearInterpolation, 
+                CubicSpline,
+                BSplineApprox, 
+                SS.Swift, 
+                SS.Voce, 
+                SS.HockettSherby, 
+                SS.StoughtonYoon]
+
+    fitfunclabels = ["Linear", 
+                    "CSplines", 
+                    "BSplineApprox",
+                    "Swift", 
+                    "Voce", 
+                    "HockettSherby",
+                    "StoughtonYoon"]
+
+    
+    push!(SSE, "interpolant" => fitfuncs[1])
+    push!(SSE, "hardening fit" => get_interpolant(SSE["interpolant"], SSE["hardening"]))
+    
+    return (;SSE, fitfuncs, fitfunclabels)
+end
+
+
+function update_SSE!(SSE, data = nothing)
+    
+    if !isnothing(data)
+        SSE["rawdata"] = (;strain = data.strain,
+                           stress = data.stress) 
+    end
+
+    
+    SSE["true stress"] = SSE["is true"] ? SSE["rawdata"] : SS.engineering_to_true(SSE["rawdata"])
+
+    SSE["modulus"] = SS.get_modulus(SSE["true stress"])
+    SSE["hardening"] = SS.get_hardening_portion(SSE["true stress"], 
+                                                SSE["modulus"]; 
+                                                offset = SSE["hardening offset"]
+                                                )
+
+    if isnothing(SSE["hardening"])
+        @show SSE["hardening offset"]
+        @show extrema(SSE["true stress"].strain)
+        @show SSE["modulus"]
+        error("Hardening Curve could not be extracted2!")
+    end
+    SSE["hardening fit"] = get_interpolant(SSE["interpolant"], SSE["hardening"])
+
+    return nothing
+end
+
+function change_true_status!(val::Bool, SSE)
+
+    SSE["is_true"] = val
+    update_SSE!(SSE)
+    return !val
+end
+
+make_gui()

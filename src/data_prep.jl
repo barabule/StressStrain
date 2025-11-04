@@ -1,7 +1,7 @@
 
 
 
-function toein_compensate(ss::AbstractStressStrainSignal;
+function toein_compensate(ss;
                 cut = 0,
                 )
 
