@@ -10,7 +10,8 @@ using Optim
 
 function make_gui(; 
                 N=1000,
-                sidebar_width = 300)
+                sidebar_width = 300,
+                alg = NelderMead())
 
     fig = Figure()
     
@@ -79,7 +80,7 @@ function make_gui(;
     ####################EVENTS########################################################################        
     on(cb_true.checked) do val
         SSE["is true"] = val
-        update_SSE!(SSE)
+        update_SSE!(SSE; alg)
         plot_stress!(axss, SSE; N)
         axss.xlabel = val ? "True Strain [-]" : "Engineering Strain [-]"
         axss.ylabel = val ? "True Stress [MPa]" : "Engineering Stress [MPa]"
@@ -87,7 +88,7 @@ function make_gui(;
 
     
     on(sld_modulus.value) do val
-        update_SSE!(SSE, nothing; modulus = round(val; sigdigits =3))
+        update_SSE!(SSE, nothing; modulus = round(val; sigdigits =3), alg)
         plot_stress!(axss, SSE; N)
         lab_modulus.text = "E = $(round(sld_modulus.value[]; sigdigits= 3))MPa"
     end
@@ -101,7 +102,7 @@ function make_gui(;
 
         # interpolant = s(SSE.stress ,SSE.strain)
         SSE["interpolant"] = s
-        update_SSE!(SSE)
+        update_SSE!(SSE; alg)
         plot_stress!(axss, SSE; N)
     end
 
@@ -115,7 +116,7 @@ function make_gui(;
         println(f1)
         data = try_open(f1)
         
-        update_SSE!(SSE, data)
+        update_SSE!(SSE, data; alg)
         
         sldvals = initialize_slider(SSE)
         sld_modulus.range = LinRange(sldvals.vmin, sldvals.vmax, 1001)
@@ -196,22 +197,23 @@ function plot_stress!(ax, SSE; N = 100, tmax = SSE["export max strain"])
 end
 
 
-function get_interpolant(func, data)
+function make_interpolant(func, data; alg = NelderMead())
+    @assert haskey(data, :strain) && haskey(data, :stress) "data must have strain and stress fields !"
     if func == SS.Swift || func == SS.Voce
         p0 = [100.0, 1e-3, 0.2]
         lb = zeros(3)
         ub = [Inf, Inf, Inf]
-        return Curvefit(data.stress, data.strain, func, p0, NelderMead(), true, lb, ub; extrapolate = true)
+        return Curvefit(data.stress, data.strain, func, p0, alg, true, lb, ub; extrapolate = true)
     elseif func == SS.HockettSherby
         p0 = [50.0, 100.0, 1.0, 0.3]
         lb = zeros(4)
         ub = fill(Inf, 4)
-        return Curvefit(data.stress, data.strain, func, p0, NelderMead(), true, lb, ub; extrapolate = true)
+        return Curvefit(data.stress, data.strain, func, p0, alg, true, lb, ub; extrapolate = true)
     elseif func == SS.StoughtonYoon
         p0 = [50.0, 100.0, 1.0, 1.0, 1e-5]
         lb = zeros(5)
         ub = fill(Inf, 5)
-        return Curvefit(data.stress, data.strain, func, p0, NelderMead(), true, lb, ub; extrapolate = true)
+        return Curvefit(data.stress, data.strain, func, p0, alg, true, lb, ub; extrapolate = true)
     elseif func == LinearInterpolation || func == CubicSpline || func == PCHIPInterpolation
         return func(data.stress, data.strain; extrapolation = ExtrapolationType.Linear)
     elseif func == BSplineApprox
@@ -255,7 +257,7 @@ function get_initial_SSE(strain, stress)
 end
 
 
-function initialize()
+function initialize(;alg = NelderMead())
     strain = LinRange(0, 0.1, 20)
     stress = 100.0 .* strain .^ 0.2
     SSE = get_initial_SSE(strain ,stress)
@@ -281,13 +283,13 @@ function initialize()
 
     
     push!(SSE, "interpolant" => fitfuncs[1])
-    push!(SSE, "hardening fit" => get_interpolant(SSE["interpolant"], SSE["hardening"]))
+    push!(SSE, "hardening fit" => make_interpolant(SSE["interpolant"], SSE["hardening"]; alg))
     
     return (;SSE, fitfuncs, fitfunclabels)
 end
 
 
-function update_SSE!(SSE, data = nothing; modulus = nothing)
+function update_SSE!(SSE, data = nothing; modulus = nothing, alg = NelderMead())
     
     if !isnothing(data)
         SSE["rawdata"] = (;strain = data.strain,
@@ -309,7 +311,7 @@ function update_SSE!(SSE, data = nothing; modulus = nothing)
         @show SSE["modulus"]
         error("Hardening Curve could not be extracted2!")
     end
-    SSE["hardening fit"] = get_interpolant(SSE["interpolant"], SSE["hardening"])
+    SSE["hardening fit"] = make_interpolant(SSE["interpolant"], SSE["hardening"]; alg)
 
     return nothing
 end
