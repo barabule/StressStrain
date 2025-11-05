@@ -88,7 +88,7 @@ function interpolant_label(interpolant, func; sigdigits = 4)
         elseif func == HockettSherby
             return "A = $(p[1]), B = $(p[2]), C = $(p[3]), H = $(p[4])"
         elseif func == StoughtonYoon
-            return "A = $(p[1]), B = $(p[2]), C = $(p[3]), m = $(p[4]), D = $([5])"
+            return "A = $(p[1]), B = $(p[2]), C = $(p[3]), m = $(p[4]), D = $(p[5])"
         elseif func == Bilinear
             return "σy = $(p[1]), Etan = $(p[2])"
         else

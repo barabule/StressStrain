@@ -12,11 +12,13 @@ using Optim
 function make_gui(; 
                 N=1000,
                 sidebar_width = 300,
-                alg = NelderMead())
+                alg = NelderMead(),
+                resample_density = 20,
+                )
 
     fig = Figure()
     
-    SSE, fitfuncs, fitfunclabels = initialize()
+    SSE, fitfuncs, fitfunclabels = initialize(; resample_density)
 
     axss = Axis(fig[1,1], title = "Stress Strain",
                     xlabel = "True Strain [-]",
@@ -67,6 +69,17 @@ function make_gui(;
 
     lab_modulus = Label(subgl1[7, :], "E = $(round(sld_modulus.value[]; sigdigits= 3))MPa")
 
+
+    sld_toein = Slider(subgl1[10, :],
+                range = LinRange(0, maximum(SSE["rawdata"].strain), 100),
+                startvalue = 0.0,
+                update_while_dragging = true,
+                width = sidebar_width,
+                )
+   
+    label_toein = Label(subgl1[9, :], "??")
+    label_toein.text[] = "Toein = " * string(round(sld_toein.value[]; sigdigits = 3))
+
     subgl2[1,1] = vgrid!(
             Label(fig, "Fitting Function", width = nothing),
             fit_menu,
@@ -97,7 +110,11 @@ function make_gui(;
     end
     
 
-
+    on(sld_toein.value) do val
+        update_SSE!(SSE; toein = val)
+        plot_stress!(axss, SSE; N)
+        update_status_label!(label_status, SSE)
+    end
 
 
     on(fit_menu.selection) do s
@@ -110,6 +127,9 @@ function make_gui(;
         plot_stress!(axss, SSE; N)
     end
 
+    on(sld_toein.value) do val
+        label_toein.text[] = "Toein = " * string(round(val; sigdigits = 3))
+    end
 
 
 
@@ -196,12 +216,13 @@ function plot_stress!(ax, SSE; N = 100, tmax = SSE["export max strain"])
     slin = E .* tlin
     lines!(ax, tlin, slin, linestyle = :dash, color = :red)
 
+    vlines!(ax, [SSE["toein"]], color= :black, linestyle = :dash)
 
     return nothing
 end
 
 
-function get_initial_SSE(strain, stress)
+function get_initial_SSE(strain, stress; resample_density = 20)
 
     SSE = Dict{String, Any}(
         "name" => "Material", 
@@ -209,8 +230,9 @@ function get_initial_SSE(strain, stress)
         "rawdata" => (;strain, stress), #do not change
         "hardening offset" => 2e-3, #offset to use to extract hardening curve
         "export density"=> 100, #number of points to export
-        "resample density" => 20, #number of points to resample rawdata
-        "resample mode"=> "decimate", #how to resample ; decimate, uniform linear, uniform cspline, approx        
+        "resample density" => resample_density, #number of points to resample rawdata
+        "resample mode"=> "decimate", #how to resample ; decimate, uniform linear, uniform cspline, approx
+        "toein" => 0.0,        
         )
     
     push!(SSE, "modulus" => SS.get_modulus(SSE["rawdata"]))
@@ -228,10 +250,14 @@ function get_initial_SSE(strain, stress)
 end
 
 
-function initialize(;alg = NelderMead())
+function initialize(;
+                    alg = NelderMead(), 
+                    resample_density = 20,
+                    )
+
     strain = LinRange(0, 0.1, 20)
     stress = 100.0 .* strain .^ 0.2
-    SSE = get_initial_SSE(strain ,stress)
+    SSE = get_initial_SSE(strain ,stress; resample_density)
 
 
     fitfuncs = [LinearInterpolation, 
@@ -262,15 +288,20 @@ function initialize(;alg = NelderMead())
 end
 
 
-function update_SSE!(SSE, data = nothing; modulus = nothing, alg = NelderMead())
+function update_SSE!(SSE, data = nothing; modulus = nothing, alg = NelderMead(), toein = nothing)
     
     if !isnothing(data)
         SSE["rawdata"] = (;strain = data.strain,
                            stress = data.stress) 
     end
 
-    
-    SSE["true stress"] = SSE["is true"] ? SSE["rawdata"] : SS.engineering_to_true(SSE["rawdata"])
+    SSE["toein"] = isnothing(toein) ? SSE["toein"] : toein
+    if SSE["toein"]>0.0
+        RD = SS.toein_compensate(SSE["rawdata"]; cut = SSE["toein"])
+    else
+        RD = SSE["rawdata"]
+    end
+    SSE["true stress"] = SSE["is true"] ? RD : SS.engineering_to_true(RD)
 
     SSE["modulus"] = isnothing(modulus) ? SS.get_modulus(SSE["true stress"]) : modulus
     SSE["hardening"] = SS.get_hardening_portion(SSE["true stress"], 
@@ -303,7 +334,15 @@ end
 
 function min_slope(SSE)
     ss = SSE["true stress"]
-    return last(ss.stress) / last(ss.strain)
+    smin = Inf
+    for i in eachindex(ss.strain)
+        i==firstindex(ss.strain) && continue
+        slp = (ss.stress[i] - ss.stress[i-1]) / (ss.strain[i] - ss.strain[i-1])
+        if smin > slp
+            smin = slp
+        end
+    end
+    return smin
 end
 
 function get_slider_range_values(SSE)

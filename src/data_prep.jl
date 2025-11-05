@@ -56,7 +56,7 @@ function get_hardening_portion(SS, modulus = nothing;offset = 2e-3)
         end
         
     end
-    return nothing
+    #we reached the end and no point was found
 end
 
 function toein_compensate(ss;
@@ -67,10 +67,11 @@ function toein_compensate(ss;
 
     icut = findfirst(s -> s>cut, ss.strain)
 
-    icut == lastindex(ss.strain) && return ss #fail
+    icut == lastindex(ss.strain) || isnothing(icut) && return ss #fail
     #this works only for smooth data...
     next_slope = (ss.stress[icut+1] - ss.stress[icut]) / 
                  (ss.strain[icut+1] - ss.strain[icut])
+    next_slope = clamp(next_slope, zero(next_slope), Inf) #no negative slope allowed
 
     el_strain = ss.stress[icut] / next_slope
     offset_strain = ss.strain[icut] - el_strain
@@ -78,7 +79,7 @@ function toein_compensate(ss;
     strainout = ss.strain[icut:end] .- offset_strain
     stressout = ss.stress[icut:end]
     #add 0,0 as first point, only if there's no 0,0 point...
-    if el_strain >0 
+    if offset_strain > 0 
         z1 = zero(eltype(ss.strain))
         z2 = zero(eltype(ss.stress))
         prepend!(strainout, z1)
