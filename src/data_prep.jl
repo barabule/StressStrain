@@ -104,3 +104,61 @@ function moving_average(A::AbstractArray, m::Int = 3)
     end
     return out
 end
+
+
+
+function decimate(xp, yp; rescale = true, tolerance=1e-3)
+    if rescale #rescale x and y to be within [0,1]
+        x , y = copy(xp), copy(yp)
+        
+        xmin, xmax = extrema(x)
+        ymin, ymax = extrema(y)
+
+        x .-= xmin
+        x .*= 1/(xmax - xmin)
+        y .-= ymin
+        y .*= 1/(ymax - ymin)
+    else
+        x, y = xp, yp
+    end
+
+    resultlist = [firstindex(x)]
+    DouglasPeucker!(resultlist, (x, y), firstindex(x), lastindex(x); tolerance)
+    idx =  sort(resultlist)
+
+    xout = xp[idx]
+    yout = yp[idx]
+
+    return (xout, yout)
+end
+
+
+function DouglasPeucker!(resultlist, points, idx1, idx2; tolerance = 1e-3)
+    x ,y = points
+    dmax = zero(eltype(x))
+    index = idx1
+
+    for i in idx1+1 : idx2
+        d = distance((x[i], y[i]), (x[idx1], y[idx1]), (x[idx2], y[idx2]))
+        if d > dmax
+            dmax = d
+            index = i
+        end
+    end
+
+    if dmax>tolerance
+        DouglasPeucker!(resultlist, points, idx1, index; tolerance)
+        DouglasPeucker!(resultlist, points, index, idx2; tolerance)
+    else
+        push!(resultlist, idx2)
+    end
+    
+end
+
+function distance(P1, L1, L2)
+    a = P1 - L1
+    d = L2 - L1
+    nd = norm(d)
+
+    return norm(a .- dot(d, a) .* d ./ norm(d))
+end

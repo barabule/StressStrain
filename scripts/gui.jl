@@ -19,8 +19,8 @@ function make_gui(;
     SSE, fitfuncs, fitfunclabels = initialize()
 
     axss = Axis(fig[1,1], title = "Stress Strain",
-                    xlabel = "Engineering Strain [-]",
-                    ylabel = "Engineering Stress [MPa]")
+                    xlabel = "True Strain [-]",
+                    ylabel = "True Stress [MPa]")
 
 
     plot_stress!(axss, SSE; N)
@@ -76,15 +76,16 @@ function make_gui(;
     )    
 
 
-
+    label_status = Label(gl_bot[1,1], "Status", tellwidth = false)
 
     ####################EVENTS########################################################################        
     on(cb_true.checked) do val
         SSE["is true"] = val
         update_SSE!(SSE; alg)
         plot_stress!(axss, SSE; N)
-        axss.xlabel = val ? "True Strain [-]" : "Engineering Strain [-]"
-        axss.ylabel = val ? "True Stress [MPa]" : "Engineering Stress [MPa]"
+        update_status_label!(label_status, SSE)
+        # axss.xlabel = val ? "True Strain [-]" : "Engineering Strain [-]"
+        # axss.ylabel = val ? "True Stress [MPa]" : "Engineering Stress [MPa]"
     end
 
     
@@ -92,6 +93,7 @@ function make_gui(;
         update_SSE!(SSE, nothing; modulus = round(val; sigdigits =3), alg)
         plot_stress!(axss, SSE; N)
         lab_modulus.text = "E = $(round(sld_modulus.value[]; sigdigits= 3))MPa"
+        update_status_label!(label_status, SSE)
     end
     
 
@@ -104,6 +106,7 @@ function make_gui(;
         # interpolant = s(SSE.stress ,SSE.strain)
         SSE["interpolant"] = s
         update_SSE!(SSE; alg)
+        update_status_label!(label_status, SSE)
         plot_stress!(axss, SSE; N)
     end
 
@@ -122,14 +125,15 @@ function make_gui(;
         sldvals = get_slider_range_values(SSE)
         sld_modulus.range = LinRange(sldvals.vmin, sldvals.vmax, 1001)
         _ = set_close_to!(sld_modulus, sldvals.value)
-
-        plot_stress!(axss, SSE; N)
         
+        plot_stress!(axss, SSE; N)
+        update_status_label!(label_status, SSE)
     end
 
     on(tb_extrapolation_strain.stored_string) do s
         SSE["export max strain"] = clamp(parse(Float64, s), last(SSE["hardening"].strain), Inf)
         plot_stress!(axss, SSE; N)
+        update_status_label!(label_status, SSE)
     end
 
     on(tb_name.stored_string) do s
@@ -166,7 +170,11 @@ function plot_stress!(ax, SSE; N = 100, tmax = SSE["export max strain"])
     empty!(ax)
     #true stress
     tss = SSE["true stress"]
-   
+    if !SSE["is true"]
+        RD = SSE["rawdata"]
+        scatterlines!(ax, RD.strain, RD.stress, color = (:grey10, 0.5), markersize = 10, label = "Raw Data")
+
+    end
     scatterlines!(ax, tss.strain, tss.stress,
                     label= "True Stress (Exp)",
                         color = :black, marker = '◉', alpha = 0.3, 
@@ -197,11 +205,12 @@ function get_initial_SSE(strain, stress)
 
     SSE = Dict{String, Any}(
         "name" => "Material", 
-        "is true" => false,
-        "rawdata" => (;strain, stress),
-        "hardening offset" => 2e-3,
-        "export density"=> 100,
-        
+        "is true" => false, #is rawdata true stress ? 
+        "rawdata" => (;strain, stress), #do not change
+        "hardening offset" => 2e-3, #offset to use to extract hardening curve
+        "export density"=> 100, #number of points to export
+        "resample density" => 20, #number of points to resample rawdata
+        "resample mode"=> "decimate", #how to resample ; decimate, uniform linear, uniform cspline, approx        
         )
     
     push!(SSE, "modulus" => SS.get_modulus(SSE["rawdata"]))
@@ -229,6 +238,7 @@ function initialize(;alg = NelderMead())
                 CubicSpline,
                 BSplineApprox,
                 PCHIPInterpolation,
+                SS.Bilinear,
                 SS.Swift, 
                 SS.Voce, 
                 SS.HockettSherby, 
@@ -238,6 +248,7 @@ function initialize(;alg = NelderMead())
                     "CSplines", 
                     "BSplineApprox",
                     "PCHIPInterpolation",
+                    "Bilinear",
                     "Swift", 
                     "Voce", 
                     "HockettSherby",
@@ -300,4 +311,11 @@ function get_slider_range_values(SSE)
     Emin = round(min_slope(SSE); sigdigits =3)
     Emax = round(5 * E; sigdigits = 3)
     return (;value = E, vmin = Emin, vmax = Emax)
+end
+
+
+function update_status_label!(label, SSE)
+
+    label.text = SS.interpolant_label(SSE["hardening fit"], SSE["interpolant"])
+
 end

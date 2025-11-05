@@ -37,6 +37,12 @@ function Hollomon(t ,p)
 end
 
 
+function Bilinear(t, p)
+    @assert length(p)>=2 "p must have at least 2 elements!"
+    sy, Etan = p[1:2]
+    return @. sy + Etan * t
+end
+
 
 
 
@@ -61,6 +67,34 @@ function make_interpolant(func, data; alg = NelderMead())
         return func(data.stress, data.strain; extrapolation = ExtrapolationType.Linear)
     elseif func == BSplineApprox
         return func(data.stress, data.strain, 3, 4, :ArcLen, :Average; extrapolation = ExtrapolationType.Linear)
+    elseif func == Bilinear
+        p0 = [30.0, 1000.0]
+        lb = zeros(2)
+        ub=  [Inf, Inf]
+        return Curvefit(data.stress, data.strain, func, p0, alg, true, lb, ub; extrapolate = true)
     end
     return nothing
+end
+
+
+function interpolant_label(interpolant, func; sigdigits = 4)
+    try
+        p = round.(interpolant.pmin; sigdigits)
+    
+        if func == Swift
+            return "K = $(p[1]), ϵ0 = $(p[2]), n = $(p[3])"
+        elseif func == Voce
+            return "σ0 = $(p[1]), Rsat = $(p[2]), ζ = $(p[3])"
+        elseif func == HockettSherby
+            return "A = $(p[1]), B = $(p[2]), C = $(p[3]), H = $(p[4])"
+        elseif func == StoughtonYoon
+            return "A = $(p[1]), B = $(p[2]), C = $(p[3]), m = $(p[4]), D = $([5])"
+        elseif func == Bilinear
+            return "σy = $(p[1]), Etan = $(p[2])"
+        else
+            return ""
+        end
+    catch
+        return ""
+    end
 end
