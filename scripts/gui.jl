@@ -97,13 +97,12 @@ function make_gui(;
         update_SSE!(SSE; alg)
         plot_stress!(axss, SSE; N)
         update_status_label!(label_status, SSE)
-        # axss.xlabel = val ? "True Strain [-]" : "Engineering Strain [-]"
-        # axss.ylabel = val ? "True Stress [MPa]" : "Engineering Stress [MPa]"
+       
     end
 
     
     on(sld_modulus.value) do val
-        update_SSE!(SSE, nothing; modulus = round(val; sigdigits =3), alg)
+        update_SSE!(SSE; modulus = round(val; sigdigits =3), alg)
         plot_stress!(axss, SSE; N)
         lab_modulus.text = "E = $(round(sld_modulus.value[]; sigdigits= 3))MPa"
         update_status_label!(label_status, SSE)
@@ -111,16 +110,15 @@ function make_gui(;
     
 
     on(sld_toein.value) do val
-        update_SSE!(SSE; toein = val)
+        SSE["toein"] = val
+        update_SSE!(SSE)
         plot_stress!(axss, SSE; N)
         update_status_label!(label_status, SSE)
     end
 
 
     on(fit_menu.selection) do s
-        #fit the function on the data
-
-        # interpolant = s(SSE.stress ,SSE.strain)
+        
         SSE["interpolant"] = s
         update_SSE!(SSE; alg)
         update_status_label!(label_status, SSE)
@@ -139,8 +137,8 @@ function make_gui(;
         f1 = first(files)
         println(f1)
         data = try_open(f1)
-        
-        update_SSE!(SSE, data; alg)
+        SSE["rawdata"] = data
+        update_SSE!(SSE; alg)
         
         sldvals = get_slider_range_values(SSE)
         sld_modulus.range = LinRange(sldvals.vmin, sldvals.vmax, 1001)
@@ -288,14 +286,11 @@ function initialize(;
 end
 
 
-function update_SSE!(SSE, data = nothing; modulus = nothing, alg = NelderMead(), toein = nothing)
+function update_SSE!(SSE; modulus = nothing, alg = NelderMead())
     
-    if !isnothing(data)
-        SSE["rawdata"] = (;strain = data.strain,
-                           stress = data.stress) 
-    end
+    
 
-    SSE["toein"] = isnothing(toein) ? SSE["toein"] : toein
+    
     if SSE["toein"]>0.0
         RD = SS.toein_compensate(SSE["rawdata"]; cut = SSE["toein"])
     else
