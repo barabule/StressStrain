@@ -8,6 +8,7 @@ using Optim
 
 
 
+
 function make_gui(; 
                 N=1000,
                 sidebar_width = 300,
@@ -56,7 +57,7 @@ function make_gui(;
              width = sidebar_width)
 
 
-    sldvals = initialize_slider(SSE)
+    sldvals = get_slider_range_values(SSE)
     sld_modulus = Slider(subgl1[8, :], 
                     range = LinRange(sldvals.vmin, sldvals.vmax, 1001),
                     startvalue= sldvals.value,
@@ -118,7 +119,7 @@ function make_gui(;
         
         update_SSE!(SSE, data; alg)
         
-        sldvals = initialize_slider(SSE)
+        sldvals = get_slider_range_values(SSE)
         sld_modulus.range = LinRange(sldvals.vmin, sldvals.vmax, 1001)
         _ = set_close_to!(sld_modulus, sldvals.value)
 
@@ -165,12 +166,7 @@ function plot_stress!(ax, SSE; N = 100, tmax = SSE["export max strain"])
     empty!(ax)
     #true stress
     tss = SSE["true stress"]
-    # scatter!(ax, tss.strain, tss.stress, 
-    #                 label = "True Stress (Exp)",
-    #                 color = :black, marker = :cross, alpha = 0.3)
-    # lines!(ax, tss.strain, tss.stress, 
-    #                 label = "True Stress (Exp)",
-    #                 color = :black, linewidth = 0.5)
+   
     scatterlines!(ax, tss.strain, tss.stress,
                     label= "True Stress (Exp)",
                         color = :black, marker = '◉', alpha = 0.3, 
@@ -195,40 +191,6 @@ function plot_stress!(ax, SSE; N = 100, tmax = SSE["export max strain"])
 
     return nothing
 end
-
-
-function make_interpolant(func, data; alg = NelderMead())
-    @assert haskey(data, :strain) && haskey(data, :stress) "data must have strain and stress fields !"
-    if func == SS.Swift || func == SS.Voce
-        p0 = [100.0, 1e-3, 0.2]
-        lb = zeros(3)
-        ub = [Inf, Inf, Inf]
-        return Curvefit(data.stress, data.strain, func, p0, alg, true, lb, ub; extrapolate = true)
-    elseif func == SS.HockettSherby
-        p0 = [50.0, 100.0, 1.0, 0.3]
-        lb = zeros(4)
-        ub = fill(Inf, 4)
-        return Curvefit(data.stress, data.strain, func, p0, alg, true, lb, ub; extrapolate = true)
-    elseif func == SS.StoughtonYoon
-        p0 = [50.0, 100.0, 1.0, 1.0, 1e-5]
-        lb = zeros(5)
-        ub = fill(Inf, 5)
-        return Curvefit(data.stress, data.strain, func, p0, alg, true, lb, ub; extrapolate = true)
-    elseif func == LinearInterpolation || func == CubicSpline || func == PCHIPInterpolation
-        return func(data.stress, data.strain; extrapolation = ExtrapolationType.Linear)
-    elseif func == BSplineApprox
-        return func(data.stress, data.strain, 3, 4, :ArcLen, :Average; extrapolation = ExtrapolationType.Linear)
-    end
-    return nothing
-end
-
-
-
-# function get_initial_ss()
-#     strain = LinRange(0, 0.1, 10)
-#     stress = 100.0 .* strain .^ 0.2
-#     return (;strain, stress)
-# end
 
 
 function get_initial_SSE(strain, stress)
@@ -283,7 +245,7 @@ function initialize(;alg = NelderMead())
 
     
     push!(SSE, "interpolant" => fitfuncs[1])
-    push!(SSE, "hardening fit" => make_interpolant(SSE["interpolant"], SSE["hardening"]; alg))
+    push!(SSE, "hardening fit" => SS.make_interpolant(SSE["interpolant"], SSE["hardening"]; alg))
     
     return (;SSE, fitfuncs, fitfunclabels)
 end
@@ -311,7 +273,7 @@ function update_SSE!(SSE, data = nothing; modulus = nothing, alg = NelderMead())
         @show SSE["modulus"]
         error("Hardening Curve could not be extracted2!")
     end
-    SSE["hardening fit"] = make_interpolant(SSE["interpolant"], SSE["hardening"]; alg)
+    SSE["hardening fit"] = SS.make_interpolant(SSE["interpolant"], SSE["hardening"]; alg)
 
     return nothing
 end
@@ -333,7 +295,7 @@ function min_slope(SSE)
     return last(ss.stress) / last(ss.strain)
 end
 
-function initialize_slider(SSE)
+function get_slider_range_values(SSE)
     E = SSE["modulus"]
     Emin = round(min_slope(SSE); sigdigits =3)
     Emax = round(5 * E; sigdigits = 3)

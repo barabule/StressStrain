@@ -36,3 +36,31 @@ function Hollomon(t ,p)
     return @. K * abs(t) ^ n
 end
 
+
+
+
+
+function make_interpolant(func, data; alg = NelderMead())
+    @assert haskey(data, :strain) && haskey(data, :stress) "data must have strain and stress fields !"
+    if func == Swift || func == Voce
+        p0 = [100.0, 1e-3, 0.2]
+        lb = zeros(3)
+        ub = [Inf, Inf, Inf]
+        return Curvefit(data.stress, data.strain, func, p0, alg, true, lb, ub; extrapolate = true)
+    elseif func == HockettSherby
+        p0 = [50.0, 100.0, 1.0, 0.3]
+        lb = zeros(4)
+        ub = fill(Inf, 4)
+        return Curvefit(data.stress, data.strain, func, p0, alg, true, lb, ub; extrapolate = true)
+    elseif func == StoughtonYoon
+        p0 = [50.0, 100.0, 1.0, 1.0, 1e-5]
+        lb = zeros(5)
+        ub = fill(Inf, 5)
+        return Curvefit(data.stress, data.strain, func, p0, alg, true, lb, ub; extrapolate = true)
+    elseif func == LinearInterpolation || func == CubicSpline || func == PCHIPInterpolation
+        return func(data.stress, data.strain; extrapolation = ExtrapolationType.Linear)
+    elseif func == BSplineApprox
+        return func(data.stress, data.strain, 3, 4, :ArcLen, :Average; extrapolation = ExtrapolationType.Linear)
+    end
+    return nothing
+end
