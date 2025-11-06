@@ -100,6 +100,9 @@ function main(;
     tb_resample = Textbox(subgl3[2,2], placeholder = "Enter number",
                     validator = Int, tellwidth = false)
 
+
+    btn_reset = Button(subgl3[3,:], label = "Reset!")
+
     ####################EVENTS########################################################################        
     on(cb_true.checked) do val
         SSE["is true"] = val
@@ -187,6 +190,12 @@ function main(;
         update_stress_plot!(axss, SSE; N)
         update_status_label!(label_status, SSE)
     end
+
+    on(btn_reset.clicks) do _
+        reset_SSE!(SSE)
+        update_stress_plot!(axss, SSE; N)
+    end
+
 
 
     return fig
@@ -312,7 +321,7 @@ function initialize(;
             LinearInterpolation,
             CubicSpline,
             BSplineApprox,
-            RegularizationSmooth,
+            QuadraticInterpolation,
             AkimaInterpolation
     ]
 
@@ -320,7 +329,7 @@ function initialize(;
         "Linear",
         "CSplines",
         "BSpline",
-        "Reg Smooth",
+        "Quadratic",
         "Akima",
     ]
 
@@ -341,18 +350,15 @@ function update_SSE!(SSE;
                         resample = false, #modifies rawdata.. 
     )
     
-    if resample #preserve the original data
-        if haskey(SSE, "original data")
-            original_data = SSE["original data"]
-        else
-            original_data = SSE["rawdata"]
+    if resample #modifies the original data
+        if !haskey(SSE, "original data")
             push!(SSE, "original data" => SSE["rawdata"])
         end
-        # @info "resampler", SSE["resampler"]
-        resampled_data = resample_curve(original_data.strain, original_data.stress, SSE["resample density"];
+        RD = SSE["rawdata"]
+        resampled_data = resample_curve(RD.strain, RD.stress, SSE["resample density"];
                                 resampler = SSE["resampler"],
                                 d =3,
-                                h = clamp(round(Int, length(original_data.strain)/10), 4, 20),
+                                h = clamp(round(Int, length(RD.strain)/10), 4, 20),
                                 )
 
         SSE["rawdata"] = (;strain = resampled_data[1], 
@@ -425,4 +431,19 @@ function update_status_label!(label, SSE)
     println(text)
     label.text = text
     # println("label changed")
+end
+
+
+function reset_SSE!(SSE)
+    if haskey(SSE, "original data") 
+        
+        delete!(SSE, "rawdata")
+        push!(SSE, "rawdata" => SSE["original data"])
+        delete!(SSE,"original data")
+        update_SSE!(SSE)
+
+    end
+    
+    return nothing
+
 end

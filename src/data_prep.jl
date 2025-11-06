@@ -176,7 +176,7 @@ function resample_curve(x, y, N::Integer=100;
 
     
     xi = collect(LinRange(extrema(x)..., N))
-    if any(resampler .== (LinearInterpolation, CubicSpline, AkimaInterpolation, QuadraticSpline))
+    if any(resampler .== (LinearInterpolation, CubicSpline, AkimaInterpolation, QuadraticSpline, QuadraticInterpolation))
         interpolator = resampler(y, x)
         return (xi, interpolator.(xi))
     elseif resampler == decimate #first ecimate, then interpolate
