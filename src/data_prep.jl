@@ -31,7 +31,7 @@ function get_modulus(SS; max_strain = 1e-3, sigdigits = 2)
     else
         E = (SS.stress[2] - SS.stress[1]) / ( SS.strain[2] - SS.strain[1]) #fallback
     end
-
+    E = clamp(E, 0.0, 1e6)
     return round(E; sigdigits)
 end
 
@@ -197,4 +197,31 @@ function resample_curve(x, y, N::Integer=100;
 
     return nothing ###
 
+end
+
+
+
+function read_stress_strain_data(fn::AbstractString;
+                        delim='\t',
+                        skipstart = 0,
+                        strain_multiplier = 1.0,
+                        stress_multiplier = 1.0,
+                        strain_col = 1,
+                        stress_col = 2,
+                        T = Float64,
+                        clean_sort = true
+                        )
+
+    rawdata = readdlm(fn, delim; skipstart)
+    @assert size(rawdata, 2) >= max(strain_col, stress_col) "Error"
+    strain = T.(rawdata[:, strain_col]) .* strain_multiplier
+    stress = T.(rawdata[:, stress_col]) .* stress_multiplier
+
+    if clean_sort
+        sortedidx = sortperm(strain)
+        strain = strain[sortedidx]
+        stress = stress[sortedidx]
+    end
+
+    return (;strain, stress)
 end

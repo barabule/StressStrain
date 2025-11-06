@@ -1,6 +1,6 @@
 
 
-function main(; 
+function main(data = nothing; 
                 N=1000,
                 sidebar_width = 300,
                 alg = NelderMead(),
@@ -9,7 +9,7 @@ function main(;
 
     fig = Figure()
     
-    SSE, fitfuncs, fitfunclabels, resamplefuncs, resamplefunclabels = initialize(; resample_density)
+    SSE, fitfuncs, fitfunclabels, resamplefuncs, resamplefunclabels = initialize(data; resample_density)
 
     axss = Axis(fig[1,1], title = "Stress Strain",
                     xlabel = "True Strain [-]",
@@ -125,6 +125,11 @@ function main(;
     on(sld_toein.value) do val
         SSE["toein"] = val
         update_SSE!(SSE)
+        
+        #update modulus slider limits?
+        sldvals = get_slider_range_values(SSE)
+        sld_modulus.range = LinRange(sldvals.vmin, sldvals.vmax, 1001)
+
         update_stress_plot!(axss, SSE; N)
         update_status_label!(label_status, SSE)
     end
@@ -288,13 +293,18 @@ function get_initial_SSE(strain, stress; resample_density = 20)
 end
 
 
-function initialize(;
+function initialize(data = nothing;
                     alg = NelderMead(), 
                     resample_density = 20,
                     )
 
-    strain = LinRange(0, 0.1, 20)
-    stress = 100.0 .* strain .^ 0.2
+    if isnothing(data)
+        strain = LinRange(0, 0.1, 20)
+        stress = 100.0 .* strain .^ 0.2
+    else
+        strain, stress = data
+        @info "This" data
+    end
     SSE = get_initial_SSE(strain ,stress; resample_density)
 
 
