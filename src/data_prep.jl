@@ -187,7 +187,8 @@ function resample_curve(x, y, N::Integer=100;
         interpolator = BSplineApprox(y, x, d, h, :ArcLen, :Average)
         return (xi, interpolator.(xi))
     elseif resampler == RegularizationSmooth
-        interpolator = RegularizationSmooth(y, x, d; alg = :gcv_svd)
+        xi, yi = resample_curve(x, y, N; resampler = LinearInterpolation)
+        interpolator = RegularizationSmooth(yi, xi, xi, d; alg = :gcv_svd)
         return (xi, interpolator.(xi))
     elseif resampler == moving_average #first smooth then resample
         newy = moving_average(y, navg)

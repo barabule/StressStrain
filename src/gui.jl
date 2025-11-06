@@ -325,6 +325,7 @@ function initialize(;
             QuadraticInterpolation,
             AkimaInterpolation,
             moving_average,
+            RegularizationSmooth,
     ]
 
     resamplefunclabels = [
@@ -334,6 +335,7 @@ function initialize(;
         "Quadratic",
         "Akima",
         "Moving Average",
+        "Reg Smooth",
     ]
 
 
