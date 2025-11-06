@@ -59,28 +59,6 @@ function main(data = nothing;
     lab_modulus = Label(subgl1[4, :], "E = $(round(sld_modulus.value[]; sigdigits= 3))MPa")
 
 
-    sld_toein = Slider(subgl1[7, :],
-                range = LinRange(0, maximum(SSE["rawdata"].strain), 100),
-                startvalue = 0.0,
-                update_while_dragging = true,
-                width = sidebar_width,
-                )
-   
-    label_toein = Label(subgl1[6, :], "??")
-    label_toein.text[] = "Toein = " * string(round(sld_toein.value[]; sigdigits = 3))
-
-
-
-    label_cutoff = Label(subgl1[8, :], "Cut off")
-    sld_cutoff = Slider(subgl1[9, :],
-                            range = LinRange(0, maximum(SSE["true stress"].strain), 1001),
-                            startvalue = last(SSE["true stress"].strain),
-                            update_while_dragging = true,
-                            width = sidebar_width,
-                            )
-
-    
-
 
     subgl2[1,1] = vgrid!(
             Label(fig, "Fitting Function", width = nothing),
@@ -89,11 +67,6 @@ function main(data = nothing;
             ;
             tellheight = false, width = 200,
     )    
-
-
-    
-
-
 
     subgl3[1,1] = vgrid!(
                     Label(fig, "Resample Function", width = nothing),
@@ -118,11 +91,12 @@ function main(data = nothing;
             halign=:left
             )
 
-
-    sld_int = IntervalSlider(gl_bot[1,1], range = LinRange(0, last(SSE["true stress"].strain), 1000),
+    Label(gl_bot[1,1], "Toe in")
+    Label(gl_bot[1,3], "Cut off")
+    sld_int = IntervalSlider(gl_bot[1,2], range = LinRange(0, last(SSE["true stress"].strain), 1000),
                     startvalues = (0.0, last(SSE["true stress"].strain)))
     
-    label_status = Label(gl_bot[2,1], "Status", tellwidth = false)
+    label_status = Label(gl_bot[2,:], "Status", tellwidth = false)
 
     ####################EVENTS########################################################################        
     on(cb_true.checked) do val
@@ -141,27 +115,6 @@ function main(data = nothing;
         update_status_label!(label_status, SSE)
     end
     
-
-    on(sld_toein.value) do val
-        SSE["toein"] = val
-        update_SSE!(SSE)
-        
-        #update modulus slider limits?
-        sldvals = get_slider_range_values(SSE)
-        sld_modulus.range = LinRange(sldvals.vmin, sldvals.vmax, 1001)
-
-        label_toein.text[] = "Toein = " * string(round(val; sigdigits = 3))
-
-        update_stress_plot!(axss, SSE; N)
-        update_status_label!(label_status, SSE)
-    end
-
-    on(sld_cutoff.value) do val
-        SSE["cut off"] = val
-        update_SSE!(SSE)
-        update_stress_plot!(axss, SSE)
-    end
-
     on(fit_menu.selection) do s
         
         SSE["interpolant"] = s
@@ -179,8 +132,7 @@ function main(data = nothing;
         update_status_label!(label_status, SSE)
     end
 
-
-
+    ### TODO better handling of files
     # on(events(fig).dropped_files) do files
     #     isempty(files) && return nothing
         
