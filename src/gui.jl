@@ -150,6 +150,8 @@ function main(data = nothing;
         sldvals = get_slider_range_values(SSE)
         sld_modulus.range = LinRange(sldvals.vmin, sldvals.vmax, 1001)
 
+        label_toein.text[] = "Toein = " * string(round(val; sigdigits = 3))
+
         update_stress_plot!(axss, SSE; N)
         update_status_label!(label_status, SSE)
     end
@@ -179,30 +181,24 @@ function main(data = nothing;
 
 
 
-    on(sld_toein.value) do val
-        label_toein.text[] = "Toein = " * string(round(val; sigdigits = 3))
-    end
-
-
-
-    on(events(fig).dropped_files) do files
-        isempty(files) && return nothing
+    # on(events(fig).dropped_files) do files
+    #     isempty(files) && return nothing
         
-        f1 = first(files)
-        println(f1)
-        data = try_open(f1)
-        if !isnothing(data)
-            SSE["rawdata"] = data
-            update_SSE!(SSE; alg)
+    #     f1 = first(files)
+    #     println(f1)
+    #     data = try_open(f1)
+    #     if !isnothing(data)
+    #         SSE["rawdata"] = data
+    #         update_SSE!(SSE; alg)
             
-            sldvals = get_slider_range_values(SSE)
-            sld_modulus.range = LinRange(sldvals.vmin, sldvals.vmax, 1001)
-            _ = set_close_to!(sld_modulus, sldvals.value)
+    #         sldvals = get_slider_range_values(SSE)
+    #         sld_modulus.range = LinRange(sldvals.vmin, sldvals.vmax, 1001)
+    #         _ = set_close_to!(sld_modulus, sldvals.value)
             
-            update_stress_plot!(axss, SSE; N)
-            update_status_label!(label_status, SSE)
-        end
-    end
+    #         update_stress_plot!(axss, SSE; N)
+    #         update_status_label!(label_status, SSE)
+    #     end
+    # end
 
     on(tb_extrapolation_strain.stored_string) do s
         SSE["export max strain"] = clamp(parse(Float64, s), last(SSE["hardening"].strain), Inf)
@@ -225,6 +221,17 @@ function main(data = nothing;
     on(btn_reset.clicks) do _
         reset_SSE!(SSE)
         update_stress_plot!(axss, SSE; N)
+    end
+
+
+    on(sld_int.interval) do intv
+        lo, hi = intv
+        SSE["toein"] = lo
+        SSE["cut off"] = hi
+
+        update_SSE!(SSE)
+        update_stress_plot!(axss, SSE;N)
+        update_status_label!(label_status, SSE)
     end
 
 
