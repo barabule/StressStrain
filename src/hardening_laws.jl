@@ -7,7 +7,6 @@ function Swift(t, p)
     @assert length(p) >= 3 "p must have at least 3 elements!"
     K, ϵ0, n = p[1:3]
     return  @. K * abs(ϵ0 + t)^n
-
 end
 
 
@@ -78,23 +77,26 @@ end
 
 
 function interpolant_label(interpolant, func; sigdigits = 4)
+    p = zeros(10)
     try
         p = round.(interpolant.pmin; sigdigits)
-    
-        if func == Swift
-            return "K = $(p[1]), ϵ0 = $(p[2]), n = $(p[3])"
-        elseif func == Voce
-            return "σ0 = $(p[1]), Rsat = $(p[2]), ζ = $(p[3])"
-        elseif func == HockettSherby
-            return "A = $(p[1]), B = $(p[2]), C = $(p[3]), H = $(p[4])"
-        elseif func == StoughtonYoon
-            return "A = $(p[1]), B = $(p[2]), C = $(p[3]), m = $(p[4]), D = $(p[5])"
-        elseif func == Bilinear
-            return "σy = $(p[1]), Etan = $(p[2])"
-        else
-            return ""
-        end
     catch
+        @info "Didn't work", func
         return ""
     end
+
+    if func == Swift
+        return "K = $(p[1]), ϵ0 = $(p[2]), n = $(p[3])"
+    elseif func == Voce
+        return "σ0 = $(p[1]), Rsat = $(p[2]), ζ = $(p[3])"
+    elseif func == HockettSherby
+        return "A = $(p[1]), B = $(p[2]), C = $(p[3]), H = $(p[4])"
+    elseif func == StoughtonYoon
+        return "A = $(p[1]), B = $(p[2]), C = $(p[3]), m = $(p[4]), D = $(p[5])"
+    elseif func == Bilinear
+        return "σy = $(p[1]), Etan = $(p[2])"
+    else
+        return ""
+    end
+    
 end

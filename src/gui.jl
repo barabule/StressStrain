@@ -1,15 +1,6 @@
-import Pkg; Pkg.activate("scripts")
-using StressStrain
-SS = StressStrain
-using GLMakie
-using DataInterpolations
-using DelimitedFiles
-using Optim
 
 
-
-
-function make_gui(; 
+function main(; 
                 N=1000,
                 sidebar_width = 300,
                 alg = NelderMead(),
@@ -235,10 +226,10 @@ function get_initial_SSE(strain, stress; resample_density = 20)
         "toein" => 0.0,        
         )
     
-    push!(SSE, "modulus" => SS.get_modulus(SSE["rawdata"]))
-    push!(SSE, "true stress" => SS.engineering_to_true(SSE["rawdata"]))
+    push!(SSE, "modulus" => get_modulus(SSE["rawdata"]))
+    push!(SSE, "true stress" => engineering_to_true(SSE["rawdata"]))
     
-    push!(SSE, "hardening" => SS.get_hardening_portion(SSE["true stress"], 
+    push!(SSE, "hardening" => get_hardening_portion(SSE["true stress"], 
                                                        SSE["modulus"]; 
                                                        offset = SSE["hardening offset"])
         )
@@ -264,11 +255,11 @@ function initialize(;
                 CubicSpline,
                 BSplineApprox,
                 PCHIPInterpolation,
-                SS.Bilinear,
-                SS.Swift, 
-                SS.Voce, 
-                SS.HockettSherby, 
-                SS.StoughtonYoon]
+                Bilinear,
+                Swift, 
+                Voce, 
+                HockettSherby, 
+                StoughtonYoon]
 
     fitfunclabels = ["Linear", 
                     "CSplines", 
@@ -282,7 +273,7 @@ function initialize(;
 
     
     push!(SSE, "interpolant" => fitfuncs[1])
-    push!(SSE, "hardening fit" => SS.make_interpolant(SSE["interpolant"], SSE["hardening"]; alg))
+    push!(SSE, "hardening fit" => make_interpolant(SSE["interpolant"], SSE["hardening"]; alg))
     
     return (;SSE, fitfuncs, fitfunclabels)
 end
@@ -294,14 +285,14 @@ function update_SSE!(SSE; modulus = nothing, alg = NelderMead())
 
     
     if SSE["toein"]>0.0
-        RD = SS.toein_compensate(SSE["rawdata"]; cut = SSE["toein"])
+        RD = toein_compensate(SSE["rawdata"]; cut = SSE["toein"])
     else
         RD = SSE["rawdata"]
     end
-    SSE["true stress"] = SSE["is true"] ? RD : SS.engineering_to_true(RD)
+    SSE["true stress"] = SSE["is true"] ? RD : engineering_to_true(RD)
 
-    SSE["modulus"] = isnothing(modulus) ? SS.get_modulus(SSE["true stress"]) : modulus
-    SSE["hardening"] = SS.get_hardening_portion(SSE["true stress"], 
+    SSE["modulus"] = isnothing(modulus) ? get_modulus(SSE["true stress"]) : modulus
+    SSE["hardening"] = get_hardening_portion(SSE["true stress"], 
                                                 SSE["modulus"]; 
                                                 offset = SSE["hardening offset"]
                                                 )
@@ -312,7 +303,7 @@ function update_SSE!(SSE; modulus = nothing, alg = NelderMead())
         @show SSE["modulus"]
         error("Hardening Curve could not be extracted2!")
     end
-    SSE["hardening fit"] = SS.make_interpolant(SSE["interpolant"], SSE["hardening"]; alg)
+    SSE["hardening fit"] = make_interpolant(SSE["interpolant"], SSE["hardening"]; alg)
 
     return nothing
 end
@@ -352,6 +343,6 @@ end
 
 function update_status_label!(label, SSE)
 
-    label.text = SS.interpolant_label(SSE["hardening fit"], SSE["interpolant"])
+    label.text[] = interpolant_label(SSE["hardening fit"], SSE["interpolant"])
 
 end
