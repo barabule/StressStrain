@@ -9,67 +9,74 @@ function main(;
 
     fig = Figure()
     
-    SSE, fitfuncs, fitfunclabels = initialize(; resample_density)
+    SSE, fitfuncs, fitfunclabels, resamplefuncs, resamplefunclabels = initialize(; resample_density)
 
     axss = Axis(fig[1,1], title = "Stress Strain",
                     xlabel = "True Strain [-]",
                     ylabel = "True Stress [MPa]")
 
 
-    plot_stress!(axss, SSE; N)
+    update_stress_plot!(axss, SSE; N)
     axislegend(axss, position = :rb, merge = true)
     fit_menu = Menu(fig, options = zip(fitfunclabels, fitfuncs),
                     default = "Linear")
     
 
-    
+    resample_menu = Menu(fig, options = zip(resamplefunclabels, resamplefuncs),
+                                default = "Linear")
 
     # sliderobservables = [s.value for s in sg.sliders]
     gl = GridLayout(fig[1,2], width = sidebar_width, tellheight = false)
 
     gl_bot = GridLayout(fig[2, :], height = 100, tellwidth = false)
 
-    subgl1 = GridLayout(gl[1,1])
-    subgl2 = GridLayout(gl[2,1])
+    subgl1 = GridLayout(gl[1, 1])
+    subgl2 = GridLayout(gl[2, 1])
+    subgl3 = GridLayout(gl[3, 1])
+
 
     cb_true = Checkbox(subgl1[1,2], checked = false, 
                             )
     Label(subgl1[1,1], "True", halign = :left)
 
 
-    Label(subgl1[2,:], "Extrapolation Strain", width = nothing)       
+    Label(subgl1[2,1], "Extrapolation Strain", width = nothing)       
     
-    tb_extrapolation_strain = Textbox(subgl1[3,:], 
+    tb_extrapolation_strain = Textbox(subgl1[2,2], 
             validator = Float64,
             )
 
 
 
-    Label(subgl1[5,:], "Material Name")
-    tb_name = Textbox(subgl1[6,:], 
+    Label(subgl1[3,:], "Material Name")
+    tb_name = Textbox(subgl1[4,:], 
              width = sidebar_width)
 
 
     sldvals = get_slider_range_values(SSE)
-    sld_modulus = Slider(subgl1[8, :], 
+    sld_modulus = Slider(subgl1[6, :], 
                     range = LinRange(sldvals.vmin, sldvals.vmax, 1001),
                     startvalue= sldvals.value,
                     update_while_dragging =true,
                     width = sidebar_width,
                     )
 
-    lab_modulus = Label(subgl1[7, :], "E = $(round(sld_modulus.value[]; sigdigits= 3))MPa")
+    lab_modulus = Label(subgl1[5, :], "E = $(round(sld_modulus.value[]; sigdigits= 3))MPa")
 
 
-    sld_toein = Slider(subgl1[10, :],
+    sld_toein = Slider(subgl1[8, :],
                 range = LinRange(0, maximum(SSE["rawdata"].strain), 100),
                 startvalue = 0.0,
                 update_while_dragging = true,
                 width = sidebar_width,
                 )
    
-    label_toein = Label(subgl1[9, :], "??")
+    label_toein = Label(subgl1[7, :], "??")
     label_toein.text[] = "Toein = " * string(round(sld_toein.value[]; sigdigits = 3))
+
+
+    
+
 
     subgl2[1,1] = vgrid!(
             Label(fig, "Fitting Function", width = nothing),
@@ -82,11 +89,22 @@ function main(;
 
     label_status = Label(gl_bot[1,1], "Status", tellwidth = false)
 
+    subgl3[1,1] = vgrid!(
+                    Label(fig, "Resample Function", width = nothing),
+                    resample_menu;
+                    tellheight = false, width = 200,
+
+    )
+
+    Label(subgl3[2,1], "Resample")
+    tb_resample = Textbox(subgl3[2,2], placeholder = "Enter number",
+                    validator = Int, tellwidth = false)
+
     ####################EVENTS########################################################################        
     on(cb_true.checked) do val
         SSE["is true"] = val
         update_SSE!(SSE; alg)
-        plot_stress!(axss, SSE; N)
+        update_stress_plot!(axss, SSE; N)
         update_status_label!(label_status, SSE)
        
     end
@@ -94,7 +112,7 @@ function main(;
     
     on(sld_modulus.value) do val
         update_SSE!(SSE; modulus = round(val; sigdigits =3), alg)
-        plot_stress!(axss, SSE; N)
+        update_stress_plot!(axss, SSE; N)
         lab_modulus.text = "E = $(round(sld_modulus.value[]; sigdigits= 3))MPa"
         update_status_label!(label_status, SSE)
     end
@@ -103,7 +121,7 @@ function main(;
     on(sld_toein.value) do val
         SSE["toein"] = val
         update_SSE!(SSE)
-        plot_stress!(axss, SSE; N)
+        update_stress_plot!(axss, SSE; N)
         update_status_label!(label_status, SSE)
     end
 
@@ -113,8 +131,19 @@ function main(;
         SSE["interpolant"] = s
         update_SSE!(SSE; alg)
         update_status_label!(label_status, SSE)
-        plot_stress!(axss, SSE; N)
+        update_stress_plot!(axss, SSE; N)
     end
+
+    on(resample_menu.selection) do s
+        
+        SSE["resampler"] = s
+        # @info "SSE", SSE["resampler"]
+        update_SSE!(SSE;resample = true)
+        update_stress_plot!(axss, SSE; N)
+        update_status_label!(label_status, SSE)
+    end
+
+
 
     on(sld_toein.value) do val
         label_toein.text[] = "Toein = " * string(round(val; sigdigits = 3))
@@ -136,14 +165,14 @@ function main(;
             sld_modulus.range = LinRange(sldvals.vmin, sldvals.vmax, 1001)
             _ = set_close_to!(sld_modulus, sldvals.value)
             
-            plot_stress!(axss, SSE; N)
+            update_stress_plot!(axss, SSE; N)
             update_status_label!(label_status, SSE)
         end
     end
 
     on(tb_extrapolation_strain.stored_string) do s
         SSE["export max strain"] = clamp(parse(Float64, s), last(SSE["hardening"].strain), Inf)
-        plot_stress!(axss, SSE; N)
+        update_stress_plot!(axss, SSE; N)
         update_status_label!(label_status, SSE)
     end
 
@@ -151,6 +180,14 @@ function main(;
         SSE["name"] = s
         axss.title = s
     end
+
+    on(tb_resample.stored_string) do s
+        SSE["resample density"] = clamp(parse(Int, s), 1, 10_000)
+        update_SSE!(SSE;alg, resample = true)
+        update_stress_plot!(axss, SSE; N)
+        update_status_label!(label_status, SSE)
+    end
+
 
     return fig
 
@@ -176,7 +213,7 @@ function try_open(fn::AbstractString,
     return nothing
 end
 
-function plot_stress!(ax, SSE; N = 100, tmax = SSE["export max strain"])
+function update_stress_plot!(ax, SSE; N = 100, tmax = SSE["export max strain"])
 
     empty!(ax)
     #true stress
@@ -222,7 +259,7 @@ function get_initial_SSE(strain, stress; resample_density = 20)
         "hardening offset" => 2e-3, #offset to use to extract hardening curve
         "export density"=> 100, #number of points to export
         "resample density" => resample_density, #number of points to resample rawdata
-        "resample mode"=> "decimate", #how to resample ; decimate, uniform linear, uniform cspline, approx
+        "resampler"=> LinearInterpolation,
         "toein" => 0.0,        
         )
     
@@ -271,18 +308,56 @@ function initialize(;
                     "HockettSherby",
                     "StoughtonYoon"]
 
-    
+    resamplefuncs = [
+            LinearInterpolation,
+            CubicSpline,
+            BSplineApprox,
+            RegularizationSmooth,
+            AkimaInterpolation
+    ]
+
+    resamplefunclabels = [
+        "Linear",
+        "CSplines",
+        "BSpline",
+        "Reg Smooth",
+        "Akima",
+    ]
+
+
+
+
+
     push!(SSE, "interpolant" => fitfuncs[1])
     push!(SSE, "hardening fit" => make_interpolant(SSE["interpolant"], SSE["hardening"]; alg))
     
-    return (;SSE, fitfuncs, fitfunclabels)
+    return (;SSE, fitfuncs, fitfunclabels, resamplefuncs, resamplefunclabels)
 end
 
 
-function update_SSE!(SSE; modulus = nothing, alg = NelderMead())
+function update_SSE!(SSE; 
+                        modulus = nothing,  #triggers recalc
+                        alg = NelderMead(),
+                        resample = false, #modifies rawdata.. 
+    )
     
-    
+    if resample #preserve the original data
+        if haskey(SSE, "original data")
+            original_data = SSE["original data"]
+        else
+            original_data = SSE["rawdata"]
+            push!(SSE, "original data" => SSE["rawdata"])
+        end
+        # @info "resampler", SSE["resampler"]
+        resampled_data = resample_curve(original_data.strain, original_data.stress, SSE["resample density"];
+                                resampler = SSE["resampler"],
+                                d =3,
+                                h = clamp(round(Int, length(original_data.strain)/10), 4, 20),
+                                )
 
+        SSE["rawdata"] = (;strain = resampled_data[1], 
+                           stress = resampled_data[2])
+    end
     
     if SSE["toein"]>0.0
         RD = toein_compensate(SSE["rawdata"]; cut = SSE["toein"])
@@ -307,6 +382,10 @@ function update_SSE!(SSE; modulus = nothing, alg = NelderMead())
 
     return nothing
 end
+
+
+
+
 
 function change_true_status!(val::Bool, SSE)
 
@@ -342,7 +421,8 @@ end
 
 
 function update_status_label!(label, SSE)
-
-    label.text[] = interpolant_label(SSE["hardening fit"], SSE["interpolant"])
-
+    text = interpolant_label(SSE["hardening fit"], SSE["interpolant"])
+    println(text)
+    label.text = text
+    # println("label changed")
 end

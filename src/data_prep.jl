@@ -163,3 +163,34 @@ function distance(P1, L1, L2)
 
     return norm(a .- dot(d, a) .* d ./ norm(d))
 end
+
+
+function resample_curve(x, y, N::Integer=100;
+                            resampler = LinearInterpolation, 
+                            tolerance = 1e-3, #tolerance for decimate
+                            d = 3, #degree for BSplineApprox or RegularizationSmooth
+                            h = 4, #number of control pts for BSplineApprox
+                            )
+
+    @assert length(x) == length(y) "x and y must  have the same length"
+
+    
+    xi = collect(LinRange(extrema(x)..., N))
+    if any(resampler .== (LinearInterpolation, CubicSpline, AkimaInterpolation, QuadraticSpline))
+        interpolator = resampler(y, x)
+        return (xi, interpolator.(xi))
+    elseif resampler == decimate #first ecimate, then interpolate
+        xii, yii = decimate(x, y; tolerance)
+        return resample(xii, yii, N;resampler = LinearInterpolation)
+    elseif resampler == BSplineApprox
+        interpolator = BSplineApprox(y, x, d, h, :ArcLen, :Average)
+        return (xi, interpolator.(xi))
+    elseif resampler == RegularizationSmooth
+        interpolator = RegularizationSmooth(y, x, d; alg = :gcv_svd)
+        return (xi, interpolator.(xi))
+    
+    end
+
+    return nothing ###
+
+end

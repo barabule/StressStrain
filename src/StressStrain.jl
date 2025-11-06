@@ -1,6 +1,7 @@
 module StressStrain
 
 using DelimitedFiles, StaticArrays, DataInterpolations, Optim, LinearAlgebra
+using RegularizationTools
 using GLMakie
 
 

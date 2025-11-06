@@ -96,7 +96,7 @@ function interpolant_label(interpolant, func; sigdigits = 4)
     elseif func == Bilinear
         return "σy = $(p[1]), Etan = $(p[2])"
     else
-        return ""
+        return "This was triggered"
     end
     
 end
