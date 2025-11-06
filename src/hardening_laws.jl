@@ -96,8 +96,8 @@ function interpolant_label(interpolant, func; sigdigits = 4)
     try
         p = round.(interpolant.pmin; sigdigits)
     catch
-        @info "Didn't work", func
-        return ""
+        # @info "Didn't work", func
+        return "No parameters"
     end
 
     if func == Swift

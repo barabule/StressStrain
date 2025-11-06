@@ -28,7 +28,7 @@ function main(data = nothing;
     # sliderobservables = [s.value for s in sg.sliders]
     gl = GridLayout(fig[1,2], width = sidebar_width, tellheight = false)
 
-    gl_bot = GridLayout(fig[2, :], height = 100, tellwidth = false)
+    gl_bot = GridLayout(fig[2, 1], height = 100, tellwidth = false)
 
     subgl1 = GridLayout(gl[1, 1])
     # subgl11 = GridLayout(gl)
@@ -91,7 +91,9 @@ function main(data = nothing;
     )    
 
 
-    label_status = Label(gl_bot[1,1], "Status", tellwidth = false)
+    
+
+
 
     subgl3[1,1] = vgrid!(
                     Label(fig, "Resample Function", width = nothing),
@@ -115,6 +117,12 @@ function main(data = nothing;
             width = 50,
             halign=:left
             )
+
+
+    sld_int = IntervalSlider(gl_bot[1,1], range = LinRange(0, last(SSE["true stress"].strain), 1000),
+                    startvalues = (0.0, last(SSE["true stress"].strain)))
+    
+    label_status = Label(gl_bot[2,1], "Status", tellwidth = false)
 
     ####################EVENTS########################################################################        
     on(cb_true.checked) do val
@@ -323,7 +331,7 @@ function initialize(data = nothing;
         stress = 100.0 .* strain .^ 0.2
     else
         strain, stress = data
-        @info "This" data
+        #@info "This" data
     end
     SSE = get_initial_SSE(strain ,stress; resample_density)
 

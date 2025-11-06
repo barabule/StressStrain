@@ -11,6 +11,7 @@ SS = StressStrain
 #         )
 
 
+# fn = "assets/DC04_QS.csv"
 fn = "assets/DC04_QS.csv"
 data = SS.read_stress_strain_data(fn; delim = ',',
                         skipstart = 1,
