@@ -31,6 +31,7 @@ function main(;
     gl_bot = GridLayout(fig[2, :], height = 100, tellwidth = false)
 
     subgl1 = GridLayout(gl[1, 1])
+    # subgl11 = GridLayout(gl)
     subgl2 = GridLayout(gl[2, 1])
     subgl3 = GridLayout(gl[3, 1])
 
@@ -322,7 +323,8 @@ function initialize(;
             CubicSpline,
             BSplineApprox,
             QuadraticInterpolation,
-            AkimaInterpolation
+            AkimaInterpolation,
+            moving_average,
     ]
 
     resamplefunclabels = [
@@ -331,6 +333,7 @@ function initialize(;
         "BSpline",
         "Quadratic",
         "Akima",
+        "Moving Average",
     ]
 
 

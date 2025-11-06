@@ -170,6 +170,7 @@ function resample_curve(x, y, N::Integer=100;
                             tolerance = 1e-3, #tolerance for decimate
                             d = 3, #degree for BSplineApprox or RegularizationSmooth
                             h = 4, #number of control pts for BSplineApprox
+                            navg = 3, #number of points for moving average filter
                             )
 
     @assert length(x) == length(y) "x and y must  have the same length"
@@ -188,7 +189,9 @@ function resample_curve(x, y, N::Integer=100;
     elseif resampler == RegularizationSmooth
         interpolator = RegularizationSmooth(y, x, d; alg = :gcv_svd)
         return (xi, interpolator.(xi))
-    
+    elseif resampler == moving_average #first smooth then resample
+        newy = moving_average(y, navg)
+        return resample_curve(x, newy, N; resampler = LinearInterpolation)
     end
 
     return nothing ###
