@@ -34,56 +34,52 @@ function main(data = nothing;
     # subgl11 = GridLayout(gl)
     subgl2 = GridLayout(gl[2, 1])
     subgl3 = GridLayout(gl[3, 1])
-
+    subgl4 = GridLayout(gl[4, 1])
 
     cb_true = Checkbox(subgl1[1,2], checked = false, 
                             )
     Label(subgl1[1,1], "True", halign = :left)
 
 
-    Label(subgl1[2,1], "Extrapolation Strain", width = nothing)       
     
-    tb_extrapolation_strain = Textbox(subgl1[2,2], 
-            validator = Float64,
-            )
 
-
-
-    Label(subgl1[3,:], "Material Name")
-    tb_name = Textbox(subgl1[4,:], 
+    Label(subgl1[2,:], "Material Name")
+    tb_name = Textbox(subgl1[3,:], 
              width = sidebar_width)
 
 
     sldvals = get_slider_range_values(SSE)
-    sld_modulus = Slider(subgl1[6, :], 
+    sld_modulus = Slider(subgl1[5, :], 
                     range = LinRange(sldvals.vmin, sldvals.vmax, 1001),
                     startvalue= sldvals.value,
                     update_while_dragging =true,
                     width = sidebar_width,
                     )
 
-    lab_modulus = Label(subgl1[5, :], "E = $(round(sld_modulus.value[]; sigdigits= 3))MPa")
+    lab_modulus = Label(subgl1[4, :], "E = $(round(sld_modulus.value[]; sigdigits= 3))MPa")
 
 
-    sld_toein = Slider(subgl1[8, :],
+    sld_toein = Slider(subgl1[7, :],
                 range = LinRange(0, maximum(SSE["rawdata"].strain), 100),
                 startvalue = 0.0,
                 update_while_dragging = true,
                 width = sidebar_width,
                 )
    
-    label_toein = Label(subgl1[7, :], "??")
+    label_toein = Label(subgl1[6, :], "??")
     label_toein.text[] = "Toein = " * string(round(sld_toein.value[]; sigdigits = 3))
 
 
-    sld_cutoff = Slider(subgl1[10, :],
+
+    label_cutoff = Label(subgl1[8, :], "Cut off")
+    sld_cutoff = Slider(subgl1[9, :],
                             range = LinRange(0, maximum(SSE["true stress"].strain), 1001),
                             startvalue = last(SSE["true stress"].strain),
                             update_while_dragging = true,
                             width = sidebar_width,
                             )
 
-    label_cutoff = Label(subgl1[9, :], "Cut off")
+    
 
 
     subgl2[1,1] = vgrid!(
@@ -110,6 +106,15 @@ function main(data = nothing;
 
 
     btn_reset = Button(subgl3[3,:], label = "Reset!")
+
+
+    Label(subgl4[1,1], "Extrapolation Strain")       
+    
+    tb_extrapolation_strain = Textbox(subgl4[1,2], 
+            validator = Float64,
+            width = 50,
+            halign=:left
+            )
 
     ####################EVENTS########################################################################        
     on(cb_true.checked) do val
@@ -261,7 +266,7 @@ function update_stress_plot!(ax, SSE; N = 100, tmax = SSE["export max strain"])
                 label = "Hardening Portion (Exp)",
                 color = :red, marker = '◉', alpha = 0.3, markersize = 20)
 
-    lines!(ax, t , SSE["hardening fit"](t), color = :black, label = "Hardening Law (Fit)", linewidth = 2.0)
+    lines!(ax, t , SSE["hardening fit"](t), color = :black, label = "Hardening Law (Fit)", linewidth = 4.0)
     
     #plot the linear portion
     E = SSE["modulus"]
@@ -331,7 +336,9 @@ function initialize(data = nothing;
                 Swift, 
                 Voce, 
                 HockettSherby, 
-                StoughtonYoon]
+                StoughtonYoon,
+                SwiftVoce,
+                ]
 
     fitfunclabels = ["Linear", 
                     "CSplines", 
@@ -341,7 +348,9 @@ function initialize(data = nothing;
                     "Swift", 
                     "Voce", 
                     "HockettSherby",
-                    "StoughtonYoon"]
+                    "StoughtonYoon",
+                    "Swift+Voce",
+                    ]
 
     resamplefuncs = [
             LinearInterpolation,

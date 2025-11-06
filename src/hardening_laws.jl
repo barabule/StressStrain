@@ -43,6 +43,13 @@ function Bilinear(t, p)
 end
 
 
+function SwiftVoce(t, p)
+    @assert length(p) >= 8 "p must have at least 8 elements"
+    w1, w2, K, ϵ0, n, σ0, Rsat, ζ = p[1:8]
+    return @. w1 * (K * abs(ϵ0 + t)^n) + 
+              w2 * (σ0 + Rsat * (1 - exp(-ζ * t)))
+end
+
 
 
 function make_interpolant(func, data; alg = NelderMead())
@@ -71,6 +78,14 @@ function make_interpolant(func, data; alg = NelderMead())
         lb = zeros(2)
         ub=  [Inf, Inf]
         return Curvefit(data.stress, data.strain, func, p0, alg, true, lb, ub; extrapolate = true)
+    elseif func == SwiftVoce
+        w1, w2 = 0.5, 0.5
+        psw = [100, 1e-3, 0.2]
+        pvc = [50, 100, 0.3]
+        p0 = [w1, w2, psw..., pvc...]
+        lb = [-Inf, -Inf, zeros(6)...]
+        ub= fill(Inf, 8)
+        return Curvefit(data.stress, data.strain, func, p0, alg, true, lb, ub; extrapolate = true)
     end
     return nothing
 end
@@ -95,6 +110,8 @@ function interpolant_label(interpolant, func; sigdigits = 4)
         return "A = $(p[1]), B = $(p[2]), C = $(p[3]), m = $(p[4]), D = $(p[5])"
     elseif func == Bilinear
         return "σy = $(p[1]), Etan = $(p[2])"
+    elseif func == SwiftVoce
+        return "w1 = $(p[1]), w2 = $(p[2]), K = $(p[3]), ϵ0 = $(p[4]), n = $(p[5]), σ0 = $(p[6]), Rsat = $(p[7]), ζ = $(p[8])"
     else
         return "This was triggered"
     end
