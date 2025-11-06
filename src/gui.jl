@@ -76,7 +76,14 @@ function main(data = nothing;
     label_toein.text[] = "Toein = " * string(round(sld_toein.value[]; sigdigits = 3))
 
 
-    
+    sld_cutoff = Slider(subgl1[10, :],
+                            range = LinRange(0, maximum(SSE["true stress"].strain), 1001),
+                            startvalue = last(SSE["true stress"].strain),
+                            update_while_dragging = true,
+                            width = sidebar_width,
+                            )
+
+    label_cutoff = Label(subgl1[9, :], "Cut off")
 
 
     subgl2[1,1] = vgrid!(
@@ -134,6 +141,11 @@ function main(data = nothing;
         update_status_label!(label_status, SSE)
     end
 
+    on(sld_cutoff.value) do val
+        SSE["cut off"] = val
+        update_SSE!(SSE)
+        update_stress_plot!(axss, SSE)
+    end
 
     on(fit_menu.selection) do s
         
@@ -259,7 +271,9 @@ function update_stress_plot!(ax, SSE; N = 100, tmax = SSE["export max strain"])
     slin = E .* tlin
     lines!(ax, tlin, slin, linestyle = :dash, color = :red)
 
-    vlines!(ax, [SSE["toein"]], color= :black, linestyle = :dash)
+    vlines!(ax, [SSE["toein"], SSE["cut off"]], color= :black, linestyle = :dash)
+
+    
 
     return nothing
 end
@@ -275,7 +289,8 @@ function get_initial_SSE(strain, stress; resample_density = 20)
         "export density"=> 100, #number of points to export
         "resample density" => resample_density, #number of points to resample rawdata
         "resampler"=> LinearInterpolation,
-        "toein" => 0.0,        
+        "toein" => 0.0,    
+        "cut off" => last(strain), #cut off value for true stress curve    
         )
     
     push!(SSE, "modulus" => get_modulus(SSE["rawdata"]))
@@ -385,7 +400,13 @@ function update_SSE!(SSE;
     else
         RD = SSE["rawdata"]
     end
-    SSE["true stress"] = SSE["is true"] ? RD : engineering_to_true(RD)
+
+    TS = SSE["is true"] ? RD : engineering_to_true(RD)
+
+    SSE["true stress"] = cutoff(TS, SSE["cut off"])
+
+
+
 
     SSE["modulus"] = isnothing(modulus) ? get_modulus(SSE["true stress"]) : modulus
     SSE["hardening"] = get_hardening_portion(SSE["true stress"], 

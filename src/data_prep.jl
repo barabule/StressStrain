@@ -225,3 +225,16 @@ function read_stress_strain_data(fn::AbstractString;
 
     return (;strain, stress)
 end
+
+
+function cutoff(data, val)
+   
+    for i in reverse(eachindex(data.strain))
+        if data.strain[i] < val
+            return (;strain = data.strain[1:i],
+                    stress = data.stress[1:i])
+        end
+    end
+    return data
+
+end
