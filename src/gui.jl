@@ -91,11 +91,22 @@ function main(data = nothing;
             halign=:left
             )
 
-    Label(gl_bot[1,1], "Toe in")
-    Label(gl_bot[1,3], "Cut off")
+    
+
     sld_int = IntervalSlider(gl_bot[1,2], range = LinRange(0, last(SSE["true stress"].strain), 1000),
                     startvalues = (0.0, last(SSE["true stress"].strain)))
     
+    
+    
+    labeltext_sld_int = lift(sld_int.interval) do int
+        t1 = "Toe in\n" * string(round(int[1], digits=3))
+        t2 = "Cut off\n" * string(round(int[2], digits=3))
+        (t1, t2)
+    end
+    
+    Label(gl_bot[1,1],  @lift $labeltext_sld_int[1]) 
+    Label(gl_bot[1,3],  @lift $labeltext_sld_int[2])
+
     label_status = Label(gl_bot[2,:], "Status", tellwidth = false)
 
     ####################EVENTS########################################################################        
@@ -180,7 +191,7 @@ function main(data = nothing;
         lo, hi = intv
         SSE["toein"] = lo
         SSE["cut off"] = hi
-
+        
         update_SSE!(SSE)
         update_stress_plot!(axss, SSE;N)
         update_status_label!(label_status, SSE)
