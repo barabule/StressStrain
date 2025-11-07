@@ -99,19 +99,19 @@ function interpolant_label(interpolant, func; sigdigits = 4)
         # @info "Didn't work", func
         return "No parameters"
     end
-
+    sy = round(func(0, p); sigdigits= 3)
     if func == Swift
-        return "K = $(p[1]), ϵ0 = $(p[2]), n = $(p[3])"
+        return "σy = $sy, K = $(p[1]), ϵ0 = $(p[2]), n = $(p[3])"
     elseif func == Voce
-        return "σ0 = $(p[1]), Rsat = $(p[2]), ζ = $(p[3])"
+        return "σy = $sy, σ0 = $(p[1]), Rsat = $(p[2]), ζ = $(p[3])"
     elseif func == HockettSherby
-        return "A = $(p[1]), B = $(p[2]), C = $(p[3]), H = $(p[4])"
+        return "σy = $sy, A = $(p[1]), B = $(p[2]), C = $(p[3]), H = $(p[4])"
     elseif func == StoughtonYoon
-        return "A = $(p[1]), B = $(p[2]), C = $(p[3]), m = $(p[4]), D = $(p[5])"
+        return "σy = $sy, A = $(p[1]), B = $(p[2]), C = $(p[3]), m = $(p[4]), D = $(p[5])"
     elseif func == Bilinear
         return "σy = $(p[1]), Etan = $(p[2])"
     elseif func == SwiftVoce
-        return "w1 = $(p[1]), w2 = $(p[2]), K = $(p[3]), ϵ0 = $(p[4]), n = $(p[5]), σ0 = $(p[6]), Rsat = $(p[7]), ζ = $(p[8])"
+        return "σy = $sy, w1 = $(p[1]), w2 = $(p[2]), K = $(p[3]), ϵ0 = $(p[4]), n = $(p[5]), σ0 = $(p[6]), Rsat = $(p[7]), ζ = $(p[8])"
     else
         return "This was triggered"
     end

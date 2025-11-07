@@ -229,24 +229,28 @@ function update_stress_plot!(ax, SSE; N = 100, tmax = SSE["export max strain"])
     #true stress
     tss = SSE["true stress"]
     if !SSE["is true"]
+        ### Engineering Stress Plot
         RD = SSE["rawdata"]
         scatterlines!(ax, RD.strain, RD.stress, color = (:grey10, 0.5), markersize = 10, label = "Raw Data")
 
     end
+    ### True Stress Plot
     scatterlines!(ax, tss.strain, tss.stress,
                     label= "True Stress (Exp)",
-                        color = :black, marker = '◉', alpha = 0.3, 
-                        markercolor = :black, 
+                        color = (:grey50, 0.5), marker = 'o', 
+                        markercolor = (:black, 0.5), 
                         markersize = 20)
+
+    ### Hardening Curve Plot
     t = LinRange(0, tmax, N)
     hss = SSE["hardening"]
     scatter!(ax, hss.strain, hss.stress, 
                 label = "Hardening Portion (Exp)",
-                color = :red, marker = '◉', alpha = 0.3, markersize = 20)
+                color = :red, marker = :cross, alpha = 0.9, markersize = 20)
 
     lines!(ax, t , SSE["hardening fit"](t), color = :black, label = "Hardening Law (Fit)", linewidth = 4.0)
     
-    #plot the linear portion
+    #E modulus plot
     E = SSE["modulus"]
     smax = maximum(SSE["hardening"].stress)
     tmax = smax / E
@@ -254,6 +258,7 @@ function update_stress_plot!(ax, SSE; N = 100, tmax = SSE["export max strain"])
     slin = E .* tlin
     lines!(ax, tlin, slin, linestyle = :dash, color = :red)
 
+    ### Cutoff limits
     vlines!(ax, [SSE["toein"], SSE["cut off"]], color= :black, linestyle = :dash)
 
     
@@ -451,8 +456,9 @@ end
 
 function update_status_label!(label, SSE)
     text = interpolant_label(SSE["hardening fit"], SSE["interpolant"])
-    println(text)
-    label.text = text
+    # println(text)
+    E = "E = $(SSE["modulus"])MPa, "
+    label.text = E * text
     # println("label changed")
 end
 
