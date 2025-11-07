@@ -234,7 +234,7 @@ function main(data = nothing;
         
         SSE["resampler"] = s
         # @info "SSE", SSE["resampler"]
-        update_SSE!(SSE;resample = true)
+        update_SSE!(SSE;resample = true, recompute_modulus = false)
         update_stress_plot!(axss, SSE; N)
         update_status_label!(label_status, SSE)
     end
@@ -273,7 +273,7 @@ function main(data = nothing;
 
     on(tb_resample.stored_string) do s
         SSE["resample density"] = clamp(parse(Int, s), 2, 10_000)
-        update_SSE!(SSE;alg, resample = true)
+        update_SSE!(SSE;alg, resample = true, recompute_modulus = false)
         update_stress_plot!(axss, SSE; N)
         update_status_label!(label_status, SSE)
     end
@@ -442,7 +442,7 @@ function initialize(data = nothing;
 
 
     fitfuncs = [LinearInterpolation, 
-                CubicSpline,
+                AkimaInterpolation,
                 BSplineApprox,
                 PCHIPInterpolation,
                 Bilinear,
@@ -454,7 +454,7 @@ function initialize(data = nothing;
                 ]
 
     fitfunclabels = ["Linear", 
-                    "CSplines", 
+                    "Akima", 
                     "BSplineApprox",
                     "PCHIPInterpolation",
                     "Bilinear",
@@ -467,6 +467,7 @@ function initialize(data = nothing;
 
     resamplefuncs = [
             LinearInterpolation,
+            Hollomon,
             CubicSpline,
             BSplineApprox,
             QuadraticInterpolation,
@@ -477,6 +478,7 @@ function initialize(data = nothing;
 
     resamplefunclabels = [
         "Linear",
+        "Hollomon",
         "CSplines",
         "BSpline",
         "Quadratic",

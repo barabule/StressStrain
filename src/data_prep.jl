@@ -177,7 +177,8 @@ function resample_curve(x, y, N::Integer=100;
 
     
     xi = collect(LinRange(extrema(x)..., N))
-    if any(resampler .== (LinearInterpolation, CubicSpline, AkimaInterpolation, QuadraticSpline, QuadraticInterpolation))
+    if any(resampler .== (LinearInterpolation, CubicSpline, AkimaInterpolation, 
+                QuadraticSpline, QuadraticInterpolation))
         interpolator = resampler(y, x)
         return (xi, interpolator.(xi))
     elseif resampler == decimate #first ecimate, then interpolate
@@ -193,6 +194,12 @@ function resample_curve(x, y, N::Integer=100;
     elseif resampler == moving_average #first smooth then resample
         newy = moving_average(y, navg)
         return resample_curve(x, newy, N; resampler = LinearInterpolation)
+    elseif resampler == Hollomon
+        p0 = [100.0, 0.2]
+        lb = zeros(2)
+        ub = [Inf, Inf]
+        interpolator =  Curvefit(y, x, resampler, p0, NelderMead(), true, lb, ub; extrapolate = true)
+        return (xi, interpolator(xi))
     end
 
     return nothing ###
