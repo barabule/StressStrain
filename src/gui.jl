@@ -129,7 +129,7 @@ function main(data = nothing;
     on(fit_menu.selection) do s
         
         SSE["interpolant"] = s
-        update_SSE!(SSE; alg)
+        update_SSE!(SSE; alg, recompute_modulus = false) #don't recalc modulus
         update_status_label!(label_status, SSE)
         update_stress_plot!(axss, SSE; N)
     end
@@ -191,8 +191,8 @@ function main(data = nothing;
         lo, hi = intv
         SSE["toein"] = lo
         SSE["cut off"] = hi
-        
         update_SSE!(SSE)
+        update_modulus_slider!(sld_modulus, SSE)
         update_stress_plot!(axss, SSE;N)
         update_status_label!(label_status, SSE)
     end
@@ -367,7 +367,8 @@ end
 
 
 function update_SSE!(SSE; 
-                        modulus = nothing,  #triggers recalc
+                        modulus = nothing,  #impose modulus
+                        recompute_modulus = true, #also triggers recalc
                         alg = NelderMead(),
                         resample = false, #modifies rawdata.. 
     )
@@ -397,10 +398,12 @@ function update_SSE!(SSE;
 
     SSE["true stress"] = cutoff(TS, SSE["cut off"])
 
-
-
-
-    SSE["modulus"] = isnothing(modulus) ? get_modulus(SSE["true stress"]) : modulus
+    if !isnothing(modulus)
+        SSE["modulus"] = modulus
+    elseif recompute_modulus 
+        SSE["modulus"] = get_modulus(SSE["true stress"])
+    end
+    
     SSE["hardening"] = get_hardening_portion(SSE["true stress"], 
                                                 SSE["modulus"]; 
                                                 offset = SSE["hardening offset"]
@@ -457,7 +460,7 @@ end
 function update_status_label!(label, SSE)
     text = interpolant_label(SSE["hardening fit"], SSE["interpolant"])
     # println(text)
-    E = "E = $(SSE["modulus"])MPa, "
+    E = "E = $(SSE["modulus"]) MPa, "
     label.text = E * text
     # println("label changed")
 end
@@ -475,4 +478,13 @@ function reset_SSE!(SSE)
     
     return nothing
 
+end
+
+
+function update_modulus_slider!(sld, SSE)
+
+    sldvals = get_slider_range_values(SSE)
+    sld.range = LinRange(sldvals.vmin, sldvals.vmax, 1001)
+    _ = set_close_to!(sld, sldvals.value)
+    return nothing
 end
