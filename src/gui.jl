@@ -9,7 +9,7 @@ function main(data = nothing;
                 resample_density = 20,
                 )
 
-    fig = Figure()
+    fig = Figure(title = "Elasto Plastic Fitter")
     
     sidebar_sub_width = subscale * sidebar_width
     bottom_panel_sub_height = subscale * bottom_panel_height
@@ -36,6 +36,8 @@ function main(data = nothing;
     true_stress_gl = GridLayout(gl[2,1])
     emod_gl = GridLayout(gl[3,1])
     hardening_gl = GridLayout(gl[4,1])
+    
+
 
     #subsub
     overview_gl_sub    = GridLayout(overview_gl[1,1], width = sidebar_sub_width, alignmode = Outside(10))
@@ -47,6 +49,13 @@ function main(data = nothing;
 
     gl_bot = GridLayout(fig[2, 1], height = bottom_panel_height, tellwidth = false)
     gl_bot_sub = GridLayout(gl_bot[1,1], alignmode = Outside(20), height = bottom_panel_sub_height)
+
+
+    export_gl = GridLayout(fig[2,2])
+    export_gl_sub = GridLayout(export_gl[1, 1], 
+                        tellheight = false, tellwidth = false, 
+                        alignmode = Outside(10))
+
 
     ############## Overview
 
@@ -120,9 +129,15 @@ function main(data = nothing;
                     default = "Linear",
                     width = 0.6 * sidebar_sub_width)
 
+    tb_hardening_pts = Textbox(fig, placeholder = "Enter number",
+                        validator = Int,
+                        width = 0.5 * sidebar_sub_width,)
+
+
     hardening_gl_sub[1,1] = vgrid!(
             Label(fig, "Hardening Curve", fontsize = 20, font =:italic),
             hgrid!(Label(fig, "Method"), fit_menu),
+            hgrid!(Label(fig, "Num Pts"), tb_hardening_pts),
             # (Label("True", alignmode = :right), Checkbox(checked = false)),
             ;
             tellheight = false, 
@@ -149,6 +164,15 @@ function main(data = nothing;
 
     label_status = Label(gl_bot_sub[2,:], "Status", tellwidth = false)
 
+    ################### Export Panel
+
+    btn_export = Button(fig, label = "Export")
+
+    export_gl_sub[1,1] = vgrid!(
+        Label(fig, "Export", font=:italic, fontsize =20),
+        btn_export
+    )
+
     #draw the damn boxes
     for gl in (overview_gl, true_stress_gl, emod_gl, hardening_gl)
         Box(gl[1,1], 
@@ -167,6 +191,11 @@ function main(data = nothing;
             z = -100)
 
 
+    Box(export_gl[1, 1],
+                linestyle = :solid,
+                color = :grey90,
+                z = -100)
+        
     ####################EVENTS########################################################################        
     on(cb_true.checked) do val
         SSE["is true"] = val
@@ -219,6 +248,7 @@ function main(data = nothing;
     #         update_stress_plot!(axss, SSE; N)
     #         update_status_label!(label_status, SSE)
     #     end
+    #    SSE["export folder"] = dirname(f1)
     # end
 
     on(tb_extrapolation_strain.stored_string) do s
@@ -233,7 +263,7 @@ function main(data = nothing;
     end
 
     on(tb_resample.stored_string) do s
-        SSE["resample density"] = clamp(parse(Int, s), 1, 10_000)
+        SSE["resample density"] = clamp(parse(Int, s), 2, 10_000)
         update_SSE!(SSE;alg, resample = true)
         update_stress_plot!(axss, SSE; N)
         update_status_label!(label_status, SSE)
@@ -244,6 +274,19 @@ function main(data = nothing;
         update_stress_plot!(axss, SSE; N)
     end
 
+
+    on(tb_hardening_pts.stored_string) do s
+        num_hardening_pts = Int(clamp(parse(Int, s), 2, Inf))
+        SSE["export density"] = num_hardening_pts
+        update_SSE!(SSE;alg)
+        update_stress_plot!(axss, SSE; N = num_hardening_pts)
+    end
+
+
+    on(btn_export.clicks) do _
+        export_data(SSE)
+
+    end
 
     on(sld_int.interval) do intv
         lo, hi = intv
@@ -256,7 +299,8 @@ function main(data = nothing;
     end
 
 
-
+    ####################################################################################################
+    
     return fig
 
 end
@@ -281,7 +325,10 @@ function try_open(fn::AbstractString,
     return nothing
 end
 
-function update_stress_plot!(ax, SSE; N = 100, tmax = SSE["export max strain"])
+function update_stress_plot!(ax, SSE; 
+                        N = 100, 
+                        tmax = SSE["export max strain"],
+                        )
 
     empty!(ax)
     #rawdata
@@ -302,7 +349,7 @@ function update_stress_plot!(ax, SSE; N = 100, tmax = SSE["export max strain"])
                         markersize = 20)
 
     ### Hardening Curve Plot
-    t = LinRange(0, tmax, N)
+    t = LinRange(0.0, tmax, N)
     hss = SSE["hardening"]
     scatter!(ax, hss.strain, hss.stress, 
                 label = "Hardening Portion (Exp)",
@@ -339,6 +386,7 @@ function get_initial_SSE(strain, stress; resample_density = 20)
         "resampler"=> LinearInterpolation,
         "toein" => 0.0,    
         "cut off" => last(strain), #cut off value for true stress curve    
+        "export folder" => nothing,
         )
     
     push!(SSE, "modulus" => get_modulus(SSE["rawdata"]))
@@ -547,4 +595,32 @@ function update_modulus_slider!(sld, SSE)
     sld.range = LinRange(sldvals.vmin, sldvals.vmax, 1001)
     _ = set_close_to!(sld, sldvals.value)
     return nothing
+end
+
+
+function export_data(SSE; delim = ',')
+    true_stress = SSE["true stress"]
+    
+    hardening_func = SSE["hardening fit"]
+    tmax = SSE["export max strain"]
+    tout = collect(LinRange(0, tmax, SSE["export density"]))
+    sout = hardening_func(tout)
+
+    output_folder =  isnothing(SSE["export folder"]) ? pwd() : SSE["export folder"]
+
+    fname = SSE["name"]
+    fname1 = joinpath(output_folder, fname * "_hardening.csv")
+    writedlm(fname1,
+                [tout sout], 
+                delim,
+                )
+
+    fname2 = joinpath(output_folder, fname * "_true stress.csv")             
+    writedlm(fname2,
+                [true_stress.strain true_stress.stress],
+                delim,
+                )
+    @info "output 1", fname1
+    @info "output 2", fname2
+    @info  "Done"
 end
