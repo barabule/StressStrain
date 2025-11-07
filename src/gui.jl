@@ -231,7 +231,7 @@ function main(data = nothing;
     end
 
     on(resample_menu.selection) do s
-        
+        #TODO better handling of modulus update when fitting on true stress
         SSE["resampler"] = s
         # @info "SSE", SSE["resampler"]
         update_SSE!(SSE;resample = true, recompute_modulus = false)
@@ -270,6 +270,7 @@ function main(data = nothing;
         SSE["name"] = s
         update_stress_plot!(axss, SSE)
     end
+
 
     on(tb_resample.stored_string) do s
         SSE["resample density"] = clamp(parse(Int, s), 2, 10_000)
@@ -360,7 +361,7 @@ function update_stress_plot!(ax, SSE;
         RD = SSE["rawdata"]
         scatterlines!(ax, RD.strain, RD.stress, 
                     color = (:grey10, 0.5), 
-                    marker = 'o', markersize = 10, label = "Raw Data")
+                    marker = 'o', markersize = 10, label = "Raw Data (Engineering)")
 
     end
     ### True Stress Plot
