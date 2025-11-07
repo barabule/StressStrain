@@ -3,12 +3,18 @@
 function main(data = nothing; 
                 N=1000,
                 sidebar_width = 300,
+                bottom_panel_height = 100,
+                subscale = 0.9,
                 alg = NelderMead(),
                 resample_density = 20,
                 )
 
     fig = Figure()
     
+    sidebar_sub_width = subscale * sidebar_width
+    bottom_panel_sub_height = subscale * bottom_panel_height
+
+
     SSE, fitfuncs, fitfunclabels, resamplefuncs, resamplefunclabels = initialize(data; resample_density)
 
     axss = Axis(fig[1,1], title = "Stress Strain",
@@ -18,82 +24,116 @@ function main(data = nothing;
 
     update_stress_plot!(axss, SSE; N)
     axislegend(axss, position = :rb, merge = true)
-    fit_menu = Menu(fig, options = zip(fitfunclabels, fitfuncs),
-                    default = "Linear")
     
+    
+
+    
+
+    
+    gl = GridLayout(fig[1,2], width = sidebar_width, tellheight = false) #holds most controls
+
+    overview_gl = GridLayout(gl[1,1])
+    true_stress_gl = GridLayout(gl[2,1])
+    emod_gl = GridLayout(gl[3,1])
+    hardening_gl = GridLayout(gl[4,1])
+
+    #subsub
+    overview_gl_sub    = GridLayout(overview_gl[1,1], width = sidebar_sub_width, alignmode = Outside(10))
+    true_stress_gl_sub = GridLayout(true_stress_gl[1,1], width = sidebar_sub_width, alignmode = Outside(10))
+    emod_gl_sub        = GridLayout(emod_gl[1,1], width = sidebar_sub_width, alignmode = Outside(10))
+    hardening_gl_sub   = GridLayout(hardening_gl[1,1], width = sidebar_sub_width, alignmode = Outside(10))
+
+
+
+    gl_bot = GridLayout(fig[2, 1], height = bottom_panel_height, tellwidth = false)
+    gl_bot_sub = GridLayout(gl_bot[1,1], alignmode = Outside(20), height = bottom_panel_sub_height)
+
+    ############## Overview
+
+    Label(overview_gl_sub[1, :], "Overview", fontsize = 20, font =:italic)
+    cb_true = Checkbox(overview_gl_sub[2,2], checked = false)
+    Label(overview_gl_sub[2,1], "True", halign = :left)
+
+
+
+    Label(overview_gl_sub[3,:], "Material Name")
+    tb_name = Textbox(overview_gl_sub[4,:], 
+             width = sidebar_sub_width,
+             placeholder = "Enter material name",
+             boxcolor = :white)
+
+    ############### True Stress
 
     resample_menu = Menu(fig, options = zip(resamplefunclabels, resamplefuncs),
                                 default = "Linear")
 
-    # sliderobservables = [s.value for s in sg.sliders]
-    gl = GridLayout(fig[1,2], width = sidebar_width, tellheight = false)
+    tb_resample = Textbox(fig, placeholder = "Enter number",
+                    validator = Int, tellwidth = false,
+                    boxcolor = :white)
 
-    gl_bot = GridLayout(fig[2, 1], height = 100, tellwidth = false)
+    btn_reset = Button(fig, label = "Reset!")
 
-    subgl1 = GridLayout(gl[1, 1])
-    # subgl11 = GridLayout(gl)
-    subgl2 = GridLayout(gl[2, 1])
-    subgl3 = GridLayout(gl[3, 1])
-    subgl4 = GridLayout(gl[4, 1])
-
-    cb_true = Checkbox(subgl1[1,2], checked = false, 
-                            )
-    Label(subgl1[1,1], "True", halign = :left)
-
-
-    
-
-    Label(subgl1[2,:], "Material Name")
-    tb_name = Textbox(subgl1[3,:], 
-             width = sidebar_width)
-
-
-    sldvals = get_slider_range_values(SSE)
-    sld_modulus = Slider(subgl1[5, :], 
-                    range = LinRange(sldvals.vmin, sldvals.vmax, 1001),
-                    startvalue= sldvals.value,
-                    update_while_dragging =true,
-                    width = sidebar_width,
-                    )
-
-    lab_modulus = Label(subgl1[4, :], "E = $(round(sld_modulus.value[]; sigdigits= 3))MPa")
-
-
-
-    subgl2[1,1] = vgrid!(
-            Label(fig, "Fitting Function", width = nothing),
-            fit_menu,
-            # (Label("True", alignmode = :right), Checkbox(checked = false)),
-            ;
-            tellheight = false, width = 200,
-    )    
-
-    subgl3[1,1] = vgrid!(
+    true_stress_gl_sub[1,1] = vgrid!(
+                    Label(fig, "True Stress Curve", fontsize = 20, font =:italic),
                     Label(fig, "Resample Function", width = nothing),
-                    resample_menu;
-                    tellheight = false, width = 200,
+                    resample_menu,
+                    hgrid!(Label(fig, "Resample"), tb_resample),
+                    btn_reset,
+    ;
+                    tellheight = false, 
+                    width = sidebar_sub_width,
 
     )
 
-    Label(subgl3[2,1], "Resample")
-    tb_resample = Textbox(subgl3[2,2], placeholder = "Enter number",
-                    validator = Int, tellwidth = false)
-
-
-    btn_reset = Button(subgl3[3,:], label = "Reset!")
-
-
-    Label(subgl4[1,1], "Extrapolation Strain")       
+    ############## Emod
     
-    tb_extrapolation_strain = Textbox(subgl4[1,2], 
+    sldvals = get_slider_range_values(SSE)
+    sld_modulus = Slider(fig, 
+                    range = LinRange(sldvals.vmin, sldvals.vmax, 1001),
+                    startvalue= sldvals.value,
+                    update_while_dragging =true,
+                    width = sidebar_sub_width,
+                    )
+
+    lab_modulus = Label(fig, "E = $(round(sld_modulus.value[]; sigdigits= 3))MPa")
+
+          
+    
+    tb_extrapolation_strain = Textbox(fig, 
             validator = Float64,
             width = 50,
-            halign=:left
+            halign=:left,
+            boxcolor = :white,
             )
 
-    
+    emod_gl_sub[1,1] = vgrid!(
+        Label(fig, "E Modulus", fontsize = 20, font =:italic),
+        lab_modulus,
+        sld_modulus,
+        hgrid!(Label(fig, "Extrapolation Strain"), tb_extrapolation_strain),
+        ;
+        width = sidebar_sub_width,
+    )
 
-    sld_int = IntervalSlider(gl_bot[1,2], range = LinRange(0, last(SSE["true stress"].strain), 1000),
+    ################ Hardening
+    fit_menu = Menu(fig, options = zip(fitfunclabels, fitfuncs),
+                    default = "Linear",
+                    width = 0.6 * sidebar_sub_width)
+
+    hardening_gl_sub[1,1] = vgrid!(
+            Label(fig, "Hardening Curve", fontsize = 20, font =:italic),
+            hgrid!(Label(fig, "Method"), fit_menu),
+            # (Label("True", alignmode = :right), Checkbox(checked = false)),
+            ;
+            tellheight = false, 
+            width = sidebar_sub_width,
+    )    
+
+
+    
+    ################## Bottom Panel    
+
+    sld_int = IntervalSlider(gl_bot_sub[1,2], range = LinRange(0, last(SSE["true stress"].strain), 1000),
                     startvalues = (0.0, last(SSE["true stress"].strain)))
     
     
@@ -104,10 +144,28 @@ function main(data = nothing;
         (t1, t2)
     end
     
-    Label(gl_bot[1,1],  @lift $labeltext_sld_int[1]) 
-    Label(gl_bot[1,3],  @lift $labeltext_sld_int[2])
+    Label(gl_bot_sub[1,1],  @lift $labeltext_sld_int[1]) 
+    Label(gl_bot_sub[1,3],  @lift $labeltext_sld_int[2])
 
-    label_status = Label(gl_bot[2,:], "Status", tellwidth = false)
+    label_status = Label(gl_bot_sub[2,:], "Status", tellwidth = false)
+
+    #draw the damn boxes
+    for gl in (overview_gl, true_stress_gl, emod_gl, hardening_gl)
+        Box(gl[1,1], 
+            linestyle = :solid,
+            color = :grey90,
+            width = sidebar_width,
+            tellwidth = true,
+            z = -100)
+
+    end
+    Box(gl_bot[1,1], 
+            linestyle = :solid,
+            height = bottom_panel_height,
+            color = :grey90,
+            tellwidth = false,
+            z = -100)
+
 
     ####################EVENTS########################################################################        
     on(cb_true.checked) do val
@@ -226,18 +284,20 @@ end
 function update_stress_plot!(ax, SSE; N = 100, tmax = SSE["export max strain"])
 
     empty!(ax)
-    #true stress
+    #rawdata
     tss = SSE["true stress"]
     if !SSE["is true"]
         ### Engineering Stress Plot
         RD = SSE["rawdata"]
-        scatterlines!(ax, RD.strain, RD.stress, color = (:grey10, 0.5), markersize = 10, label = "Raw Data")
+        scatterlines!(ax, RD.strain, RD.stress, 
+                    color = (:grey10, 0.5), 
+                    marker = 'o', markersize = 10, label = "Raw Data")
 
     end
     ### True Stress Plot
     scatterlines!(ax, tss.strain, tss.stress,
                     label= "True Stress (Exp)",
-                        color = (:grey50, 0.5), marker = 'o', 
+                        color = (:grey50, 0.5), marker = :diamond, 
                         markercolor = (:black, 0.5), 
                         markersize = 20)
 
