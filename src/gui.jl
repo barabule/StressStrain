@@ -17,13 +17,11 @@ function main(data = nothing;
 
     SSE, fitfuncs, fitfunclabels, resamplefuncs, resamplefunclabels = initialize(data; resample_density)
 
-    axss = Axis(fig[1,1], title = "Stress Strain",
-                    xlabel = "True Strain [-]",
-                    ylabel = "True Stress [MPa]")
+    axss = initialize_axis(fig)
 
 
     update_stress_plot!(axss, SSE; N)
-    axislegend(axss, position = :rb, merge = true)
+    
     
     
 
@@ -51,7 +49,8 @@ function main(data = nothing;
     gl_bot_sub = GridLayout(gl_bot[1,1], alignmode = Outside(20), height = bottom_panel_sub_height)
 
 
-    export_gl = GridLayout(fig[2,2])
+    # export_gl = GridLayout(fig[2,2])
+    export_gl = GridLayout(gl[5,1])
     export_gl_sub = GridLayout(export_gl[1, 1], 
                         tellheight = false, tellwidth = false, 
                         alignmode = Outside(10))
@@ -108,18 +107,12 @@ function main(data = nothing;
 
           
     
-    tb_extrapolation_strain = Textbox(fig, 
-            validator = Float64,
-            width = 50,
-            halign=:left,
-            boxcolor = :white,
-            )
+    
 
     emod_gl_sub[1,1] = vgrid!(
         Label(fig, "E Modulus", fontsize = 20, font =:italic),
         lab_modulus,
         sld_modulus,
-        hgrid!(Label(fig, "Extrapolation Strain"), tb_extrapolation_strain),
         ;
         width = sidebar_sub_width,
     )
@@ -131,13 +124,21 @@ function main(data = nothing;
 
     tb_hardening_pts = Textbox(fig, placeholder = "Enter number",
                         validator = Int,
-                        width = 0.5 * sidebar_sub_width,)
+                        width = 0.5 * sidebar_sub_width,
+                        )
 
+    tb_extrapolation_strain = Textbox(fig, 
+                        validator = Float64,
+                        width = 50,
+                        halign=:left,
+                        boxcolor = :white,
+                        )
 
     hardening_gl_sub[1,1] = vgrid!(
             Label(fig, "Hardening Curve", fontsize = 20, font =:italic),
             hgrid!(Label(fig, "Method"), fit_menu),
             hgrid!(Label(fig, "Num Pts"), tb_hardening_pts),
+            hgrid!(Label(fig, "Extrapolate strain to"), tb_extrapolation_strain),
             # (Label("True", alignmode = :right), Checkbox(checked = false)),
             ;
             tellheight = false, 
@@ -166,11 +167,19 @@ function main(data = nothing;
 
     ################### Export Panel
 
+
+
     btn_export = Button(fig, label = "Export")
+
+    cb_exp_true = Checkbox(fig, checked = true)
+    cb_exp_hardening = Checkbox(fig, checked = true)
+    cb_exp_plot = Checkbox(fig, checked = true)
 
     export_gl_sub[1,1] = vgrid!(
         Label(fig, "Export", font=:italic, fontsize =20),
-        btn_export
+        hgrid!(vgrid!(Label(fig, "True Stress"), Label(fig, "Hardening"), Label(fig, "Plot")),
+               vgrid!(cb_exp_true, cb_exp_hardening, cb_exp_plot)),
+        btn_export,
     )
 
     #draw the damn boxes
@@ -259,7 +268,7 @@ function main(data = nothing;
 
     on(tb_name.stored_string) do s
         SSE["name"] = s
-        axss.title = s
+        update_stress_plot!(axss, SSE)
     end
 
     on(tb_resample.stored_string) do s
@@ -284,7 +293,9 @@ function main(data = nothing;
 
 
     on(btn_export.clicks) do _
-        export_data(SSE)
+        export_data(SSE; export_true = cb_exp_true.checked[],
+                        export_hardening = cb_exp_hardening.checked[],
+                        export_plot = cb_exp_plot.checked[])
 
     end
 
@@ -331,6 +342,17 @@ function update_stress_plot!(ax, SSE;
                         )
 
     empty!(ax)
+    fig = ax.parent
+    #delete the legend
+    for (i, block) in enumerate(fig.content)
+        if block isa Makie.Legend
+            # 3. If found, delete it using the delete! function
+            Makie.delete!(block)
+        end
+    end
+
+
+    ax.title = SSE["name"]
     #rawdata
     tss = SSE["true stress"]
     if !SSE["is true"]
@@ -368,7 +390,7 @@ function update_stress_plot!(ax, SSE;
     ### Cutoff limits
     vlines!(ax, [SSE["toein"], SSE["cut off"]], color= :black, linestyle = :dash)
 
-    
+    axislegend(ax, position = :rb, merge = true)
 
     return nothing
 end
@@ -539,10 +561,7 @@ function change_true_status!(val::Bool, SSE)
     return !val
 end
 
-function export_data(SSE)
-    
 
-end
 
 function min_slope(SSE)
     ss = SSE["true stress"]
@@ -598,7 +617,24 @@ function update_modulus_slider!(sld, SSE)
 end
 
 
-function export_data(SSE; delim = ',')
+function initialize_axis(fig)
+    return Axis(fig[1,1], title = "Stress Strain",
+                    xlabel = "True Strain [-]",
+                    ylabel = "True Stress [MPa]")
+
+end
+
+
+
+function export_data(SSE; 
+                    delim = ',',
+                    export_true = true,
+                    export_hardening = true,
+                    export_plot = true,
+                    plot_export_format = :svg,
+                    px_per_unit = 4, #output size scaling
+                    )
+
     true_stress = SSE["true stress"]
     
     hardening_func = SSE["hardening fit"]
@@ -609,18 +645,36 @@ function export_data(SSE; delim = ',')
     output_folder =  isnothing(SSE["export folder"]) ? pwd() : SSE["export folder"]
 
     fname = SSE["name"]
-    fname1 = joinpath(output_folder, fname * "_hardening.csv")
-    writedlm(fname1,
-                [tout sout], 
-                delim,
-                )
+    if export_hardening
+        fname1 = joinpath(output_folder, fname * "_hardening.csv")
+        writedlm(fname1,
+                    [tout sout], 
+                    delim,
+                    )
+    end
 
-    fname2 = joinpath(output_folder, fname * "_true stress.csv")             
-    writedlm(fname2,
-                [true_stress.strain true_stress.stress],
-                delim,
-                )
-    @info "output 1", fname1
-    @info "output 2", fname2
+    if export_true
+        fname2 = joinpath(output_folder, fname * "_true stress.csv")             
+        writedlm(fname2,
+                    [true_stress.strain true_stress.stress],
+                    delim,
+                    )
+    end
+
+    if export_plot
+        fname3 = joinpath(output_folder, fname * "_plot.png")
+        # save(fname3, colorbuffer(ax.scene))
+        fig = Figure()
+        ax = initialize_axis(fig)
+        update_stress_plot!(ax, SSE; N = SSE["export density"])
+
+        label_status = Label(fig[2,1],tellwidth = false)
+        update_status_label!(label_status, SSE)
+        
+        display(GLMakie.Screen(), fig)
+        save(fname3, fig; px_per_unit)
+    end
+
+
     @info  "Done"
 end
