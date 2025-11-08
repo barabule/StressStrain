@@ -354,6 +354,11 @@ function update_stress_plot!(ax, SSE;
 
 
     ax.title = SSE["name"]
+    #original data
+    if haskey(SSE, "original data")
+        OD = SSE["original data"]
+        scatter!(ax, OD.strain, OD.stress, color = (:grey90, 0.1), markersize = 1)
+    end
     #rawdata
     tss = SSE["true stress"]
     if !SSE["is true"]

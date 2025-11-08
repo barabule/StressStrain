@@ -1,14 +1,20 @@
 using GLMakie
 using Observables
 
+
+#### AI generated
+
 # --- 1. Bézier Curve Calculation ---
 # A function to calculate a point on a cubic Bézier segment
 # P0, P1, P2, P3 are the four control points (Points)
 function cubic_bezier_point(t::Real, P0, P1, P2, P3)
     # The standard cubic Bézier formula: B(t) = (1-t)³P₀ + 3(1-t)²tP₁ + 3(1-t)t²P₂ + t³P₃
-    w0 = (1 - t)^3
-    w1 = 3 * (1 - t)^2 * t
-    w2 = 3 * (1 - t) * t^2
+    a = 1 - t
+    b = a * a
+    c = b * a
+    w0 = c
+    w1 = 3 * b * t
+    w2 = 3 * a * t^2
     w3 = t^3
     return P0 * w0 + P1 * w1 + P2 * w2 + P3 * w3
 end
