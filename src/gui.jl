@@ -103,16 +103,26 @@ function main(data = nothing;
                     width = sidebar_sub_width,
                     )
 
+
+
+
     lab_modulus = Label(fig, "E = $(round(sld_modulus.value[]; sigdigits= 3))MPa")
 
-          
-    
+    sld_offset = Slider(fig,
+                range= LinRange(0.0, 0.1, 101),
+                startvalue = 2e-3,
+                update_while_dragging = true,
+                
+                )
+
+    lab_offset = Label(fig, "Offset = $(round(sld_offset.value[]; sigdigits = 3))")
     
 
     emod_gl_sub[1,1] = vgrid!(
         Label(fig, "E Modulus", fontsize = 20, font =:italic),
         lab_modulus,
         sld_modulus,
+        hgrid!(lab_offset, sld_offset)
         ;
         width = sidebar_sub_width,
     )
@@ -222,6 +232,12 @@ function main(data = nothing;
         update_status_label!(label_status, SSE)
     end
     
+    on(sld_offset.value) do val
+        SSE["hardening offset"] = val
+        update_SSE!(SSE;recompute_modulus =false)
+        update_stress_plot!(axss, SSE; N)
+    end
+
     on(fit_menu.selection) do s
         
         SSE["interpolant"] = s
@@ -392,7 +408,8 @@ function update_stress_plot!(ax, SSE;
     tlin = LinRange(0, tmax, 10)
     slin = E .* tlin
     lines!(ax, tlin, slin, linestyle = :dash, color = :red)
-
+    #hardening offset
+    lines!(ax, tlin .+ SSE["hardening offset"],slin, color = (:red, 0.1), linestyle = :solid )
     ### Cutoff limits
     vlines!(ax, [SSE["toein"], SSE["cut off"]], color= :black, linestyle = :dash)
 

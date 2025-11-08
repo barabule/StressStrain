@@ -23,15 +23,17 @@ end
 
 function get_modulus(SS; max_strain = 1e-3, sigdigits = 2)
     @assert haskey(SS, :strain) && haskey(SS, :stress) "SS must have fields strain and stress !"
+    #TODO if the E modulus is too small
     N = length(SS.strain)
-    N >= 2 || error("Stress Strain data needs to have at least 2 points!")
+    @assert N >= 2 "Stress Strain data needs to have at least 2 points!"
     idx = findall(s -> s<= max_strain, SS.strain)
     if !isempty(idx) && length(idx) >= 2
         E = SS.strain[idx] \ SS.stress[idx]
     else
         E = (SS.stress[2] - SS.stress[1]) / ( SS.strain[2] - SS.strain[1]) #fallback
     end
-    E = clamp(E, 0.0, 1e6)
+    Emin = last(SS.stress) / last(SS.strain)
+    E = clamp(E, 5Emin, 1e8)
     return round(E; sigdigits)
 end
 
