@@ -175,7 +175,7 @@ function update_data_plot!(ax, data)
     end
 
     scatterlines!(ax, data.strain, data.stress, label = "Data")
-
+    axislegend(ax, position = :rb)
 
 end
 

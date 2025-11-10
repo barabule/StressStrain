@@ -324,6 +324,7 @@ function main(data = nothing;
         SSE["toein"] = lo
         SSE["cut off"] = hi
         update_SSE!(SSE; recompute_modulus = true)
+        
         update_modulus_slider!(sld_modulus, SSE)
         update_stress_plot!(axss, SSE;N)
         update_status_label!(label_status, SSE)
@@ -392,6 +393,7 @@ function update_stress_plot!(ax, SSE;
     E = SSE["modulus"]
     smax = maximum(SSE["hardening"].stress)
     tmax = smax / E
+    tmax = min(last(SSE["true stress"].strain), tmax)
     tlin = LinRange(0, tmax, 10)
     slin = E .* tlin
     lines!(ax, tlin, slin, linestyle = :dash, color = :red)
