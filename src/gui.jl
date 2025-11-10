@@ -1,6 +1,7 @@
 
 
 function main(data = nothing; 
+                import_defaults = nothing,
                 N=1000,
                 sidebar_width = 300,
                 bottom_panel_height = 100,
@@ -8,6 +9,19 @@ function main(data = nothing;
                 alg = NelderMead(),
                 resample_density = 20,
                 )
+
+
+    if isnothing(import_defaults)
+        import_defaults = Dict{Symbol, Any}(
+                :delim => ',',
+                :skipstart => 0,
+                :strain_col => 1,
+                :stress_col => 2,
+                :strain_mult => 1.0,
+                :stress_mult => 1.0,
+        )
+    end
+
 
     fig = Figure(title = "Elasto Plastic Fitter")
     
@@ -259,7 +273,7 @@ function main(data = nothing;
         f1 = first(files)
         println(f1)
         
-        data_gui(screen, f1)
+        data_gui(screen, f1, import_defaults)
         update_stress_plot!(axss, SSE)
     end
 

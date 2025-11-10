@@ -1,6 +1,6 @@
 
 
-function data_gui(parent_screen::GLMakie.Screen , fn::AbstractString;
+function data_gui(parent_screen::GLMakie.Screen , fn::AbstractString, defaults = nothing::Union{Nothing, Dict};
                 sidebar_width = 300)
 
 
@@ -8,11 +8,6 @@ function data_gui(parent_screen::GLMakie.Screen , fn::AbstractString;
 
     ax_plot = Axis(fig[1,1])
     controls = GridLayout(fig[1,2], tellheight = false, width = sidebar_width)
-
-
-    
-
-    
 
     delim_list = zip(
                     (",", "TAB", "SPACE", ";",),
@@ -25,20 +20,29 @@ function data_gui(parent_screen::GLMakie.Screen , fn::AbstractString;
 
     tb_skip = Textbox(fig, 
                     validator = Int, 
+                    stored_string = isnothing(defaults) ? "0" : string(defaults[:skipstart]),
                     )
 
 
     tb_strain_col = Textbox(fig,
-                        validator = Int)
+                        validator = Int, 
+                        stored_string = isnothing(defaults) ? "1" : string(defaults[:strain_col]),
+                        )
 
     tb_stress_col = Textbox(fig, 
-                        validator = Int)
+                        validator = Int,
+                        stored_string = isnothing(defaults) ? "2" : string(defaults[:stress_col]),
+    )
 
     tb_strain_mult = Textbox(fig, 
-                        validator = Int)
+                        validator = Int,
+                        stored_string = isnothing(defaults) ? "1.0" : string(defaults[:strain_mult]),
+    )
 
     tb_stress_mult = Textbox(fig, 
-                        validator = Int)
+                        validator = Int,
+                        stored_string = isnothing(defaults) ? "1.0" : string(defaults[:stress_mult]),
+    )
 
 
     btn_import = Button(fig, label = "Import")
@@ -57,15 +61,23 @@ function data_gui(parent_screen::GLMakie.Screen , fn::AbstractString;
 
 
     ################defaults###########################################################
+    if isnothing(defaults)
+        delim = Observable(',')
+        skipstart = Observable(0)
+        strain_col = Observable(1)
+        stress_col = Observable(2)
 
-    delim = Observable(',')
-    skipstart = Observable(0)
-    strain_col = Observable(1)
-    stress_col = Observable(2)
+        strain_mult = Observable(1.0)
+        stress_mult = Observable(1.0)
+    else
+        delim = defaults[:delim]
+        skipstart = defaults[:skipstart]
+        strain_col = defaults[:strain_col]
+        stress_col = defaults[:stress_col]
 
-    strain_mult = Observable(1.0)
-    stress_mult = Observable(1.0)
-
+        strain_mult = defaults[:strain_mult]
+        stress_mult = defaults[:stress_mult]
+    end
     data = Observable(nothing::Union{Nothing, NamedTuple})
     ###############EVENTS##############################################################
 
@@ -102,15 +114,18 @@ function data_gui(parent_screen::GLMakie.Screen , fn::AbstractString;
 
 
     on(btn_import.clicks) do _
-        
-        data = read_stress_strain_data(fn;
-                    delim = delim[], 
-                    skipstart = skipstart[],
-                    strain_col = strain_col[],
-                    stress_col = stress_col[],
-                    strain_multiplier = strain_mult[],
-                    stress_multiplier =stress_mult[],
-                    )
+        try
+            data = read_stress_strain_data(fn;
+                        delim = delim[], 
+                        skipstart = skipstart[],
+                        strain_col = strain_col[],
+                        stress_col = stress_col[],
+                        strain_multiplier = strain_mult[],
+                        stress_multiplier =stress_mult[],
+                        )
+        catch
+            println("Could not import!")
+        end
         if !isnothing(data)
             update_data_plot!(ax_plot, data)
         else
@@ -127,7 +142,15 @@ function data_gui(parent_screen::GLMakie.Screen , fn::AbstractString;
             close(screen)
             #probably the cleanest
             close(parent_screen)
-            main(data)
+            defaults[:delim] = delim[]
+            defaults[:skipstart] = skipstart[]
+            defaults[:strain_col] = strain_col[]
+            defaults[:stress_col] = stress_col[]
+            defaults[:strain_mult] = strain_mult[]
+            defaults[:stress_mult] = stress_mult[]
+
+            main(data; import_defaults = defaults)
+            
         end
 
     end
