@@ -21,19 +21,29 @@ end
 
 
 
-function get_modulus(SS; max_strain = 1e-3, sigdigits = 2)
+function get_modulus(SS; 
+                max_strain = 1e-3, #considier strains up to max_strain for fitting
+                sigdigits = 2, #makes no sense to return E moduli with too much precision
+                Emin = 1e-8, #smallest possible E modulus
+                Emax = 1e9) #largest possible E modulus
+
+
+
     @assert haskey(SS, :strain) && haskey(SS, :stress) "SS must have fields strain and stress !"
-    #TODO if the E modulus is too small
+    
     N = length(SS.strain)
     @assert N >= 2 "Stress Strain data needs to have at least 2 points!"
+
     idx = findall(s -> s<= max_strain, SS.strain)
     if !isempty(idx) && length(idx) >= 2
         E = SS.strain[idx] \ SS.stress[idx]
     else
         E = (SS.stress[2] - SS.stress[1]) / ( SS.strain[2] - SS.strain[1]) #fallback
     end
-    Emin = last(SS.stress) / last(SS.strain)
-    E = clamp(E, 5Emin, 1e8)
+    
+    Esmallest = abs(last(SS.stress) / last(SS.strain)) #should be the smallest module given the data
+    E = clamp(E, Esmallest, Emax)
+    @assert Emin <= E <= Emax "E modulus $(E) is outside bounds!"
     return round(E; sigdigits)
 end
 
@@ -240,7 +250,7 @@ end
 
 function cutoff(data, val)
     @assert val > 0 "Cutoff value must be positive!" 
-   @assert haskey(ss, :strain) && haskey(ss, :stress) "ss must have fields strain and stress !"
+   @assert haskey(data, :strain) && haskey(data, :stress) "ss must have fields strain and stress !"
     for i in reverse(eachindex(data.strain))
         if data.strain[i] < val
             return (;strain = data.strain[1:i],

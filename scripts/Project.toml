@@ -1,7 +1,2 @@
 [deps]
-DataInterpolations = "82cc6244-b520-54b8-b5a6-8a565e85f1d0"
-DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
-GLMakie = "e9467ef8-e4e7-5192-8a1a-b1aee30e663a"
-Optim = "429524aa-4258-5aef-a3af-852621145aeb"
-StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 StressStrain = "35c0c9d5-9623-45a6-a87f-5a655e412bc9"

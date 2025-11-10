@@ -98,15 +98,16 @@ function make_interpolant(func, data; alg = NelderMead())
 end
 
 
-function interpolant_label(interpolant, func; sigdigits = 4)
+function interpolant_label(interpolant, func; sigdigits = 3)
     p = zeros(10)
     try
         p = round.(interpolant.pmin; sigdigits)
     catch
         # @info "Didn't work", func
-        return "No parameters"
+        sy = round(interpolant(0); sigdigits)
+        return "σy = $sy, No parameters"
     end
-    sy = round(func(0, p); sigdigits= 3)
+    sy = round(func(0, p); sigdigits)
     if func == Swift
         return "σy = $sy, K = $(p[1]), ϵ0 = $(p[2]), n = $(p[3])"
     elseif func == Voce

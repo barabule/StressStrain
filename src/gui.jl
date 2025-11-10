@@ -252,30 +252,22 @@ function main(data = nothing;
         update_status_label!(label_status, SSE)
     end
 
-    ### TODO better handling of files
-    # on(events(fig).dropped_files) do files
-    #     isempty(files) && return nothing
+    
+    on(events(fig).dropped_files) do files
+        isempty(files) && return nothing
         
-    #     f1 = first(files)
-    #     println(f1)
-    #     data = try_open(f1)
-    #     if !isnothing(data)
-    #         SSE["rawdata"] = data
-    #         update_SSE!(SSE; alg)
-            
-    #         sldvals = get_slider_range_values(SSE)
-    #         sld_modulus.range = LinRange(sldvals.vmin, sldvals.vmax, 1001)
-    #         _ = set_close_to!(sld_modulus, sldvals.value)
-            
-    #         update_stress_plot!(axss, SSE; N)
-    #         update_status_label!(label_status, SSE)
-    #     end
-    #    SSE["export folder"] = dirname(f1)
-    # end
+        f1 = first(files)
+        println(f1)
+        
+        data_gui(screen, f1)
+        update_stress_plot!(axss, SSE)
+    end
 
     on(tb_extrapolation_strain.stored_string) do s
+        
         SSE["export max strain"] = clamp(parse(Float64, s), last(SSE["hardening"].strain), Inf)
         update_stress_plot!(axss, SSE; N)
+        update_status_label!(label_status, SSE)
         update_status_label!(label_status, SSE)
     end
 
@@ -324,9 +316,10 @@ function main(data = nothing;
     end
 
 
-    ####################################################################################################
-    
-    return fig
+    ##################    WINDOW   ################################################################
+    screen = GLMakie.Screen()
+    GLFW.SetWindowTitle(screen.glscreen, "Stress Strain Fitter")
+    return display(screen, fig)
 
 end
 
@@ -406,7 +399,7 @@ function update_stress_plot!(ax, SSE;
     slin = E .* tlin
     lines!(ax, tlin, slin, linestyle = :dash, color = :red)
     #hardening offset
-    lines!(ax, tlin .+ SSE["hardening offset"],slin, color = (:red, 0.1), linestyle = :solid )
+    lines!(ax, tlin .+ SSE["hardening offset"],slin, color = (:red, 0.3), linestyle = :solid )
     ### Cutoff limits
     vlines!(ax, [SSE["toein"], SSE["cut off"]], color= :black, linestyle = :dash)
 
@@ -457,11 +450,11 @@ function initialize(data = nothing;
     else
         strain, stress = data
         #@info "This" data
-
+        
     end
     SSE = get_initial_SSE(strain ,stress; resample_density)
     if haskey(data, :folder)
-        SSE["save folder"] = data.folder
+        SSE["export folder"] = data.folder
     end
 
     fitfuncs = [LinearInterpolation, 
@@ -696,8 +689,10 @@ function export_data(SSE;
         label_status = Label(fig[2,1],tellwidth = false)
         update_status_label!(label_status, SSE)
         
-        display(GLMakie.Screen(), fig)
+        screen = GLMakie.Screen()
+        display(screen, fig)
         save(fname3, fig; px_per_unit)
+        close(screen)
     end
 
 
