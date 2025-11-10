@@ -22,10 +22,9 @@ end
 
 
 function get_modulus(SS; 
-                max_strain = 1e-3, #considier strains up to max_strain for fitting
+                max_strain = 1e-3, #consider strains up to max_strain for fitting
                 sigdigits = 2, #makes no sense to return E moduli with too much precision
-                Emin = 1e-8, #smallest possible E modulus
-                Emax = 1e9) #largest possible E modulus
+                ) 
 
 
 
@@ -34,20 +33,37 @@ function get_modulus(SS;
     N = length(SS.strain)
     @assert N >= 2 "Stress Strain data needs to have at least 2 points!"
 
-    idx = findall(s -> s<= max_strain, SS.strain)
+    idx = findall(s -> 0 <= s <= max_strain, SS.strain)
     if !isempty(idx) && length(idx) >= 2
         E = SS.strain[idx] \ SS.stress[idx]
     else
         E = (SS.stress[2] - SS.stress[1]) / ( SS.strain[2] - SS.strain[1]) #fallback
     end
+
+    Emin, Emax = bracket_modulus(SS)
+    E = clamp(E, Emin, Emax)
     
-    Esmallest = abs(last(SS.stress) / last(SS.strain)) #should be the smallest module given the data
-    E = clamp(E, Esmallest, Emax)
-    @assert Emin <= E <= Emax "E modulus $(E) is outside bounds!"
     return round(E; sigdigits)
 end
 
+function bracket_modulus(data;
+                    sigdigits = 2)
+    @assert haskey(data, :strain) && haskey(data, :stress) "Data must have fields strain and stress!"
 
+    Emin , Emax = Inf, -Inf
+
+    for i in eachindex(data.strain)
+        ϵ, σ = data.strain[i], data.stress[i]
+        # ϵ <= 0 || σ <= 0 && continue #ignore invalid data
+        slp = σ / ϵ #secant modulus
+        slp <=0 && continue 
+        Emin = slp < Emin ? slp : Emin
+        Emax = slp > Emax ? slp : Emax
+    end
+    @assert Emin > 0 && Emax > 0
+    return (;Emin = round(Emin; sigdigits), 
+             Emax = round(Emax; sigdigits))
+end
 
 
 

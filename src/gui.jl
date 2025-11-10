@@ -323,7 +323,7 @@ function main(data = nothing;
         lo, hi = intv
         SSE["toein"] = lo
         SSE["cut off"] = hi
-        update_SSE!(SSE)
+        update_SSE!(SSE; recompute_modulus = true)
         update_modulus_slider!(sld_modulus, SSE)
         update_stress_plot!(axss, SSE;N)
         update_status_label!(label_status, SSE)
@@ -338,24 +338,7 @@ function main(data = nothing;
 end
 
 
-function try_open(fn::AbstractString,
-                    skipstart = 0)
 
-
-    # rawdata = readdlm(fn)
-    # return (;strain = rawdata[:,1],
-    #         stress = rawdata[:, 2])
-    delims = [',','\t',';']
-
-    for delim in delims
-        rawdata = readdlm(fn, delim;skipstart)
-        size(rawdata, 2) >= 2 || continue
-        eltype(rawdata) == Any && continue
-        return (;strain = rawdata[:,1], 
-                stress = rawdata[:, 2])
-    end
-    return nothing
-end
 
 function update_stress_plot!(ax, SSE; 
                         N = 100, 
@@ -536,7 +519,7 @@ function update_SSE!(SSE;
     )
     
     if resample #modifies the original data
-        if !haskey(SSE, "original data")
+        if !haskey(SSE, "original data") #first time
             push!(SSE, "original data" => SSE["rawdata"])
         end
         RD = SSE["rawdata"]
@@ -595,25 +578,31 @@ end
 
 
 
-function min_slope(SSE)
-    ss = SSE["true stress"]
-    smin = Inf
-    for i in eachindex(ss.strain)
-        i==firstindex(ss.strain) && continue
-        slp = (ss.stress[i] - ss.stress[i-1]) / (ss.strain[i] - ss.strain[i-1])
-        if smin > slp
-            smin = slp
-        end
-    end
-    return smin
-end
 
-function get_slider_range_values(SSE)
+
+function get_slider_range_values(SSE; sigdigits = 2)
     E = SSE["modulus"]
-    Emin = round(min_slope(SSE); sigdigits =3)
-    Emax = round(5 * E; sigdigits = 3)
+    Ebracket = bracket_modulus(SSE["true stress"])
+    Emin = Ebracket.Emin
+    Emax = Ebracket.Emax
+    if E < Emin || E > Emax
+        E = Emax
+        update_SSE!(SSE; modulus = E)
+    end
+    Emin = round(Emin;sigdigits)
+    Emax = 10round(Emax;sigdigits)
     return (;value = E, vmin = Emin, vmax = Emax)
 end
+
+
+function update_modulus_slider!(sld, SSE)
+
+    sldvals = get_slider_range_values(SSE)
+    sld.range = LinRange(sldvals.vmin, sldvals.vmax, 1001)
+    _ = set_close_to!(sld, sldvals.value)
+    return nothing
+end
+
 
 
 function update_status_label!(label, SSE)
@@ -623,6 +612,7 @@ function update_status_label!(label, SSE)
     label.text = E * text
     # println("label changed")
 end
+
 
 
 function reset_SSE!(SSE)
@@ -640,13 +630,7 @@ function reset_SSE!(SSE)
 end
 
 
-function update_modulus_slider!(sld, SSE)
 
-    sldvals = get_slider_range_values(SSE)
-    sld.range = LinRange(sldvals.vmin, sldvals.vmax, 1001)
-    _ = set_close_to!(sld, sldvals.value)
-    return nothing
-end
 
 
 function initialize_axis(fig)
