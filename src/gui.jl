@@ -24,16 +24,12 @@ function main(data = nothing;
     
     
     
+    sidebar = GridLayout(fig[1,2], width = sidebar_width, tellheight = false) #holds most controls
 
-    
-
-    
-    gl = GridLayout(fig[1,2], width = sidebar_width, tellheight = false) #holds most controls
-
-    overview_gl = GridLayout(gl[1,1])
-    true_stress_gl = GridLayout(gl[2,1])
-    emod_gl = GridLayout(gl[3,1])
-    hardening_gl = GridLayout(gl[4,1])
+    overview_gl = GridLayout(sidebar[1,1])
+    true_stress_gl = GridLayout(sidebar[2,1])
+    emod_gl = GridLayout(sidebar[3,1])
+    hardening_gl = GridLayout(sidebar[4,1])
     
 
 
@@ -50,7 +46,7 @@ function main(data = nothing;
 
 
     # export_gl = GridLayout(fig[2,2])
-    export_gl = GridLayout(gl[5,1])
+    export_gl = GridLayout(sidebar[5,1])
     export_gl_sub = GridLayout(export_gl[1, 1], 
                         tellheight = false, tellwidth = false, 
                         alignmode = Outside(10))
@@ -193,8 +189,8 @@ function main(data = nothing;
     )
 
     #draw the damn boxes
-    for gl in (overview_gl, true_stress_gl, emod_gl, hardening_gl)
-        Box(gl[1,1], 
+    for sidebar in (overview_gl, true_stress_gl, emod_gl, hardening_gl)
+        Box(sidebar[1,1], 
             linestyle = :solid,
             color = :grey90,
             width = sidebar_width,
@@ -236,6 +232,7 @@ function main(data = nothing;
         SSE["hardening offset"] = val
         update_SSE!(SSE;recompute_modulus =false)
         update_stress_plot!(axss, SSE; N)
+        lab_offset.text = "Offset = $(round(sld_offset.value[]; sigdigits = 3))"
     end
 
     on(fit_menu.selection) do s
@@ -460,9 +457,12 @@ function initialize(data = nothing;
     else
         strain, stress = data
         #@info "This" data
+
     end
     SSE = get_initial_SSE(strain ,stress; resample_density)
-
+    if haskey(data, :folder)
+        SSE["save folder"] = data.folder
+    end
 
     fitfuncs = [LinearInterpolation, 
                 AkimaInterpolation,
@@ -493,7 +493,7 @@ function initialize(data = nothing;
             Hollomon,
             CubicSpline,
             BSplineApprox,
-            QuadraticInterpolation,
+            QuadraticSpline,
             AkimaInterpolation,
             moving_average,
             RegularizationSmooth,

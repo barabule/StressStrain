@@ -222,6 +222,8 @@ function read_stress_strain_data(fn::AbstractString;
                         )
 
     rawdata = readdlm(fn, delim; skipstart)
+    folder = dirname(fn)
+
     @assert size(rawdata, 2) >= max(strain_col, stress_col) "Error"
     strain = T.(rawdata[:, strain_col]) .* strain_multiplier
     stress = T.(rawdata[:, stress_col]) .* stress_multiplier
@@ -232,12 +234,13 @@ function read_stress_strain_data(fn::AbstractString;
         stress = stress[sortedidx]
     end
 
-    return (;strain, stress)
+    return (;strain, stress, folder)
 end
 
 
 function cutoff(data, val)
-   
+    @assert val > 0 "Cutoff value must be positive!" 
+   @assert haskey(ss, :strain) && haskey(ss, :stress) "ss must have fields strain and stress !"
     for i in reverse(eachindex(data.strain))
         if data.strain[i] < val
             return (;strain = data.strain[1:i],
