@@ -276,3 +276,46 @@ function cutoff(data, val)
     return data
 
 end
+
+
+
+function find_abnormal_points(data; tooclose = 1e-6)
+
+    @assert haskey(data, :strain) && haskey(data, :stress) "data must have strain and stress fields !"
+
+
+    abnormal_indices = Int[]
+    unique_strains = Dict{Float64, Int}()
+    lastidx = -1
+    for i in eachindex(data.strain)
+        eps, sig = data.strain[i], data.stress[i]
+
+        if i != firstindex(data.strain) 
+
+            if data.strain[lastidx] > eps #non monotonic strain
+                push!(abnormal_indices, i)
+                lastidx = i
+                continue
+            end
+
+        end
+        lastidx = i
+
+        eps_key = round(Int, eps / tooclose)
+        if haskey(unique_strains, eps_key)#find repeated strain pts
+            push!(abnormal_indices,  i)
+            continue
+        else
+            push!(unique_strains, eps_key => i)
+        end
+
+        if eps < 0 || sig < 0#negative strain / stress
+            push!(abnormal_indices, i)
+            continue
+        end
+        
+        
+    end
+
+    return abnormal_indices
+end

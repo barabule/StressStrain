@@ -1,7 +1,9 @@
 
 
 function data_gui(parent_screen::GLMakie.Screen , fn::AbstractString, defaults = nothing::Union{Nothing, Dict};
-                sidebar_width = 300)
+                sidebar_width = 300,
+                tooclose = 1e-6, #tolerance for too close strain points
+                )
 
 
     fig = Figure()
@@ -47,6 +49,7 @@ function data_gui(parent_screen::GLMakie.Screen , fn::AbstractString, defaults =
 
     btn_import = Button(fig, label = "Import")
     btn_done   = Button(fig, label = "Done!")
+    btn_clean = Button(fig, label = "Clean!")
 
     controls[1,1] = vgrid!(
             hgrid!(Label(fig, "Delimiter"), menu_delim),
@@ -55,7 +58,7 @@ function data_gui(parent_screen::GLMakie.Screen , fn::AbstractString, defaults =
             hgrid!(Label(fig, "Stress column:"), tb_stress_col),
             hgrid!(Label(fig, "Strain multiplier:"), tb_strain_mult),
             hgrid!(Label(fig, "Stress multiplier"), tb_stress_mult),
-            btn_import,
+            hgrid!(btn_import, btn_clean),
             btn_done,
     )
 
@@ -79,6 +82,9 @@ function data_gui(parent_screen::GLMakie.Screen , fn::AbstractString, defaults =
         stress_mult = defaults[:stress_mult]
     end
     data = Observable(nothing::Union{Nothing, NamedTuple})
+
+    abnormal_indices = Observable{Vector{Int}}
+
     ###############EVENTS##############################################################
 
     
@@ -123,17 +129,27 @@ function data_gui(parent_screen::GLMakie.Screen , fn::AbstractString, defaults =
                         strain_multiplier = strain_mult[],
                         stress_multiplier =stress_mult[],
                         )
+            abnormal_indices = find_abnormal_points(data; tooclose)
         catch
             println("Could not import!")
         end
+
         if !isnothing(data)
-            update_data_plot!(ax_plot, data)
+            update_data_plot!(ax_plot, data, abnormal_indices)
         else
             println("Could not import!")
         end
 
     end
    
+    on(btn_clean.clicks) do _
+        if !isnothing(data)
+            clean!(data, abnormal_indices)
+            empty!(abnormal_indices)
+            update_data_plot!(ax_plot, data, abnormal_indices)
+        end
+
+    end
 
     on(btn_done.clicks) do _
         if !isnothing(data) 
@@ -161,7 +177,7 @@ function data_gui(parent_screen::GLMakie.Screen , fn::AbstractString, defaults =
 end
 
 
-function update_data_plot!(ax, data)
+function update_data_plot!(ax, data, abnormal = nothing)
     @assert haskey(data, :strain) && haskey(data, :stress) "Data must have strain and stress fields!"
 
     empty!(ax)
@@ -174,8 +190,23 @@ function update_data_plot!(ax, data)
         end
     end
 
-    scatterlines!(ax, data.strain, data.stress, label = "Data")
+    scatterlines!(ax, data.strain, data.stress, label = "Data", color = (:black, 0.5))
+    #color abnormal points in red
+    if !isnothing(abnormal)
+        scatter!(ax, data.strain[abnormal], data.stress[abnormal], 
+                        color = :red, 
+                        marker= 'X',
+                        markersize = 8)
+    end
+
     axislegend(ax, position = :rb)
 
 end
 
+function clean!(data, abnormal_indices)
+  
+
+    deleteat!(data.strain, abnormal_indices)
+    deleteat!(data.stress, abnormal_indices)
+   
+end
