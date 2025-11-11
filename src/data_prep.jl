@@ -231,14 +231,19 @@ function resample_curve(x, y, N::Integer=100;
         ub = [Inf, Inf]
         interpolator =  Curvefit(y, x, resampler, p0, NelderMead(), true, lb, ub; extrapolate = true)
         return (xi, interpolator(xi))
-    elseif resampler == RambergOsgood
-        n = 10
-        sy = 50.0
-        p0 = [n, sy]
-        lb = [1.0, 1e-8]
-        ub = [Inf, Inf]
-        m = (t, p) -> RambergOsgood(t, p; offset , E)
-        return Curvefit(y, x, m, p0, alg, true, lb, ub;extrapolate = true)
+    elseif resampler == RamberOsgoodAlternativeReparametrized
+        # σy, ϵy, b, r
+        sy = 0.5 * maximum(y)
+        ey = 0.1 * maximum(x) + 0.9 * minimum(x)
+        b = 0.2
+        r = 1.0
+
+        p0 = [sy, ey, b, r]
+        lb = [1e-8, 1e-8, 0.0, 0.0]
+        ub = [Inf, Inf, Inf, Inf]
+        
+        interpolator = Curvefit(y, x, resampler, p0, alg, true, lb, ub;extrapolate = true)
+        return (xi, interpolator(xi))
     end
 
     return nothing ###

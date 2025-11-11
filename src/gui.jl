@@ -211,8 +211,14 @@ function main(data = nothing;
     cb_exp_hardening = Checkbox(fig, checked = true)
     cb_exp_plot = Checkbox(fig, checked = true)
 
+    # menu_export_format = Menu(fig, 
+    #                             options = zip(("PNG", "SVG"), (:png, :svg)),
+    #                             default = "PNG",
+    #                             )
+
     export_gl_sub[1,1] = vgrid!(
         Label(fig, "Export", font=:italic, fontsize =20),
+        # menu_export_format,
         hgrid!(vgrid!(Label(fig, "True Stress"), Label(fig, "Hardening"), Label(fig, "Plot")),
                vgrid!(cb_exp_true, cb_exp_hardening, cb_exp_plot)),
         btn_export,
@@ -346,7 +352,9 @@ function main(data = nothing;
     on(btn_export.clicks) do _
         export_data(SSE; export_true = cb_exp_true.checked[],
                         export_hardening = cb_exp_hardening.checked[],
-                        export_plot = cb_exp_plot.checked[])
+                        export_plot = cb_exp_plot.checked[],
+                        # plot_export_format = menu_export_format.selection,
+                        )
 
     end
 
@@ -521,6 +529,7 @@ function initialize(data = nothing;
             AkimaInterpolation,
             moving_average,
             RegularizationSmooth,
+            RamberOsgoodAlternativeReparametrized,
     ]
 
     resamplefunclabels = [
@@ -532,6 +541,7 @@ function initialize(data = nothing;
         "Akima",
         "Moving Average",
         "Reg Smooth",
+        "RambergOsgoodAlt"
     ]
 
 
@@ -698,7 +708,7 @@ function export_data(SSE;
                     export_true = true,
                     export_hardening = true,
                     export_plot = true,
-                    plot_export_format = :svg,
+                    plot_export_format = :png,
                     px_per_unit = 2, #output size scaling
                     )
 
@@ -729,8 +739,10 @@ function export_data(SSE;
     end
 
     if export_plot
-        fname3 = joinpath(output_folder, fname * "_plot.png")
-        # save(fname3, colorbuffer(ax.scene))
+        # fext = plot_export_format==:png ? ".png" : ".svg" #doesn't work in GLMakie...
+        fext = ".png"
+        fname3 = joinpath(output_folder, fname * "_plot" * fext)
+        
         fig = Figure()
         ax = initialize_axis(fig)
         update_stress_plot!(ax, SSE; N = SSE["export density"])

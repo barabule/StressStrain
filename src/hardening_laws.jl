@@ -63,7 +63,7 @@ function RamberOsgoodAlternativeReparametrized(t, p)
     σy, ϵy, b, r = p[1:4]
 
     ϵbar = @. t / ϵy
-    σbar = @. b * ϵbar + (1 - b) * ϵbar / (1 + abs(ϵbar))^(1/r)
+    σbar = @. b * ϵbar + (1 - b) * ϵbar / (1 + abs(ϵbar) ^ r) ^ (1 / r)
     return @. σbar * σy   
 end
 
@@ -188,8 +188,9 @@ function interpolant_label(interpolant, func; sigdigits = 3)
         return "σy = $(p[1]), Etan = $(p[2])"
     elseif func == SwiftVoce
         return "σy = $sy, w1 = $(p[1]), w2 = $(p[2]), K = $(p[3]), ϵ0 = $(p[4]), n = $(p[5]), σ0 = $(p[6]), Rsat = $(p[7]), ζ = $(p[8])"
-    elseif func == RambergOsgood
-        return "σy = $sy, n = $(p[1])"
+    elseif func == RamberOsgoodAlternativeReparametrized
+        σy, ϵy, b, r = p[1:4]
+        return "σy = $σy, ϵy = $ϵy, b = $b, r = $r"
     else
         return "This was triggered"
     end
