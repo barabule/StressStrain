@@ -557,14 +557,16 @@ function update_SSE!(SSE;
             push!(SSE, "original data" => SSE["rawdata"])
         end
         RD = SSE["rawdata"]
-        resampled_data = resample_curve(RD.strain, RD.stress, SSE["resample density"];
-                                resampler = SSE["resampler"],
-                                d =3,
-                                h = clamp(round(Int, length(RD.strain)/10), 4, 20),
-                                )
+        if SSE["resampler"] != RambergOsgood
+            resampled_data = resample_curve(RD.strain, RD.stress, SSE["resample density"];
+                                    resampler = SSE["resampler"],
+                                    d =3,
+                                    h = clamp(round(Int, length(RD.strain)/10), 4, 20),
+                                    )
 
-        SSE["rawdata"] = (;strain = resampled_data[1], 
-                           stress = resampled_data[2])
+            SSE["rawdata"] = (;strain = resampled_data[1], 
+                            stress = resampled_data[2])
+        end
     end
     
     if SSE["toein"]>0.0
@@ -585,6 +587,18 @@ function update_SSE!(SSE;
         end
     end
     
+    if SSE["resampler"] == RambergOsgood
+        resampled_data = resample_curve(SSE["true stress"].strain, 
+                                        SSE["true stress"].stress, 
+                                        length(SSE["true stress"].strain); #it's actually a fit
+                                        resampler = SSE["resampler"],
+                                        offset = SSE["hardening offset"],
+                                        E = SSE["modulus"],
+                                        )
+
+    end
+
+
     SSE["hardening"] = get_hardening_portion(SSE["true stress"], 
                                                 SSE["modulus"]; 
                                                 offset = SSE["hardening offset"]
@@ -596,6 +610,7 @@ function update_SSE!(SSE;
         @show SSE["modulus"]
         error("Hardening Curve could not be extracted2!")
     end
+    
     SSE["hardening fit"] = make_interpolant(SSE["interpolant"], SSE["hardening"]; alg)
 
     return nothing
@@ -684,7 +699,7 @@ function export_data(SSE;
                     export_hardening = true,
                     export_plot = true,
                     plot_export_format = :svg,
-                    px_per_unit = 4, #output size scaling
+                    px_per_unit = 2, #output size scaling
                     )
 
     true_stress = SSE["true stress"]

@@ -58,6 +58,74 @@ function SwiftVoce(t, p)
 end
 
 
+function RamberOsgoodAlternativeReparametrized(t, p)
+    @assert length(p)>=4 "p must have at least 4 elements!"
+    σy, ϵy, b, r = p[1:4]
+
+    ϵbar = @. t / ϵy
+    σbar = @. b * ϵbar + (1 - b) * ϵbar / (1 + abs(ϵbar))^(1/r)
+    return @. σbar * σy   
+end
+
+
+function RambergOsgood(t, p; offset = 2e-3, E = 1.0, maxiter = 50)
+    @assert length(p) >= 2 "p must have at least 2 elements!"
+    n, sigy = p[1:2]
+
+    alpha = offset * E/sigy
+    return @. find_RO_stress(t, E, sigy, n, alpha; maxiter)
+end
+
+function find_RO_stress(t, E, sigy, n, alpha; 
+        maxiter = 20, 
+        abstol = 1e-8, #abs error tolerance
+        dtol = 1e-12, #derivative tolerance
+        ctol = 1e-4, #convergence tolerance
+        sig0 = E * t, #first guess
+        ) 
+    
+    @assert t>=0 "Strain must be positive!"
+    @assert E > 0 "E modulus must be positive!"
+    @assert sigy >0 "Yield stress must be positive!"
+    
+
+    sig = sig0
+    for it in 1:maxiter
+        fval, dval = RO_with_derivative(sig, E, sigy, n, alpha)
+        if abs(fval) < abstol
+            return sig
+        end
+        if abs(dval) < dtol
+            @warn "Derivate almost 0; cannot converge!"
+            return sig
+        end
+
+        sig_new = sig  - fval / dval
+
+        relative_change = abs(sig_new - sig) / sig
+        if relative_change < ctol #convergence
+            return sig_new
+        end
+        sig = sig_new
+    end
+    @warn "Maximum iterations ($max_iter) reached!"
+    return sig 
+end
+
+
+function RO_with_derivative(sigma, E, sigy, n, alpha)
+    elastic_strain = sigma / E
+    plastic_strain = alpha * (sigma / E) * (sigma / sigy)^n
+    total_strain = elastic_strain + plastic_strain
+
+    d_elastic = 1/E
+    d_plastic = (alpha * n / (E * sigy ^ (n -1))) * sigma ^ (n-1)
+    d_total = d_elastic + d_plastic
+
+    return (total_strain, d_total)
+end
+
+
 
 function make_interpolant(func, data; alg = NelderMead())
     @assert haskey(data, :strain) && haskey(data, :stress) "data must have strain and stress fields !"
@@ -120,6 +188,8 @@ function interpolant_label(interpolant, func; sigdigits = 3)
         return "σy = $(p[1]), Etan = $(p[2])"
     elseif func == SwiftVoce
         return "σy = $sy, w1 = $(p[1]), w2 = $(p[2]), K = $(p[3]), ϵ0 = $(p[4]), n = $(p[5]), σ0 = $(p[6]), Rsat = $(p[7]), ζ = $(p[8])"
+    elseif func == RambergOsgood
+        return "σy = $sy, n = $(p[1])"
     else
         return "This was triggered"
     end

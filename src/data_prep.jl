@@ -199,6 +199,9 @@ function resample_curve(x, y, N::Integer=100;
                             d = 3, #degree for BSplineApprox or RegularizationSmooth
                             h = 4, #number of control pts for BSplineApprox
                             navg = 3, #number of points for moving average filter
+                            offset = 2e-3,
+                            E = 1.0,
+                            alg = NelderMead(),
                             )
 
     @assert length(x) == length(y) "x and y must  have the same length"
@@ -228,6 +231,14 @@ function resample_curve(x, y, N::Integer=100;
         ub = [Inf, Inf]
         interpolator =  Curvefit(y, x, resampler, p0, NelderMead(), true, lb, ub; extrapolate = true)
         return (xi, interpolator(xi))
+    elseif resampler == RambergOsgood
+        n = 10
+        sy = 50.0
+        p0 = [n, sy]
+        lb = [1.0, 1e-8]
+        ub = [Inf, Inf]
+        m = (t, p) -> RambergOsgood(t, p; offset , E)
+        return Curvefit(y, x, m, p0, alg, true, lb, ub;extrapolate = true)
     end
 
     return nothing ###

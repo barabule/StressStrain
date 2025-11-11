@@ -203,10 +203,17 @@ function update_data_plot!(ax, data, abnormal = nothing)
 
 end
 
-function clean!(data, abnormal_indices)
+function clean!(data, abnormal_indices; maxiter = 10)
   
+    for _ in 1:maxiter
+        isempty(abnormal_indices) && break
+        deleteat!(data.strain, abnormal_indices)
+        deleteat!(data.stress, abnormal_indices)
+    
+        abnormal_indices = find_abnormal_points(data)
 
-    deleteat!(data.strain, abnormal_indices)
-    deleteat!(data.stress, abnormal_indices)
-   
+    end   
+
+    return nothing
+
 end
