@@ -23,6 +23,9 @@ function main(data = nothing;
     end
 
 
+    
+
+
     fig = Figure(title = "Elasto Plastic Fitter")
     
     sidebar_sub_width = subscale * sidebar_width
@@ -106,6 +109,8 @@ function main(data = nothing;
     ############## Emod
     
     sldvals = get_slider_range_values(SSE)
+    
+
     sld_modulus = Slider(fig, 
                     range = LinRange(sldvals.vmin, sldvals.vmax, 1001),
                     startvalue= sldvals.value,
@@ -116,7 +121,14 @@ function main(data = nothing;
 
 
 
-    lab_modulus = Label(fig, "E = $(round(sld_modulus.value[]; sigdigits= 3))MPa")
+    lab_modulus = Label(fig, "E = ")
+
+    tb_modulus = Textbox(fig, 
+                            placeholder = "$(round(sld_modulus.value[]; sigdigits= 3))MPa",
+                            validator = Float64,
+                            width = 0.4 * sidebar_sub_width,
+                            )
+
 
     sld_offset = Slider(fig,
                 range= LinRange(0.0, 0.1, 101),
@@ -125,13 +137,17 @@ function main(data = nothing;
                 
                 )
 
+
+    cb_fixed = Checkbox(fig, checked = false)
+    
     lab_offset = Label(fig, "Offset = $(round(sld_offset.value[]; sigdigits = 3))")
     
 
     emod_gl_sub[1,1] = vgrid!(
         Label(fig, "E Modulus", fontsize = 20, font =:italic),
-        lab_modulus,
+        hgrid!(lab_modulus, tb_modulus, Label(fig, "MPa")),
         sld_modulus,
+        hgrid!(Label(fig, "Fix Modulus"), cb_fixed),
         hgrid!(lab_offset, sld_offset)
         ;
         width = sidebar_sub_width,
@@ -238,10 +254,25 @@ function main(data = nothing;
     on(sld_modulus.value) do val
         update_SSE!(SSE; modulus = round(val; sigdigits =3), alg)
         update_stress_plot!(axss, SSE; N)
-        lab_modulus.text = "E = $(round(sld_modulus.value[]; sigdigits= 3))MPa"
+        tb_modulus.displayed_string = "$(round(sld_modulus.value[]; sigdigits= 3))"
         update_status_label!(label_status, SSE)
     end
+
+    on(tb_modulus.stored_string) do s
+        #update modulus only in the checkbox is unchecked
+        if !cb_fixed.checked[]
+            modulus = round(parse(Float64, s); sigdigits = 3)
+            update_SSE!(SSE; modulus)
+            update_stress_plot!(axss, SSE;N)
+            update_status_label!(label_status, SSE)
+        end
+    end
+
     
+    on(cb_fixed.checked) do val
+        SSE["fixed modulus"] = val
+    end
+
     on(sld_offset.value) do val
         SSE["hardening offset"] = val
         update_SSE!(SSE;recompute_modulus =false)
@@ -421,6 +452,7 @@ function get_initial_SSE(strain, stress; resample_density = 20)
         "toein" => 0.0,    
         "cut off" => last(strain), #cut off value for true stress curve    
         "export folder" => nothing,
+        "fixed modulus"=> false, #if this is set, modulus cannot change
         )
     
     push!(SSE, "modulus" => get_modulus(SSE["rawdata"]))
@@ -545,10 +577,12 @@ function update_SSE!(SSE;
 
     SSE["true stress"] = cutoff(TS, SSE["cut off"])
 
-    if !isnothing(modulus)
-        SSE["modulus"] = modulus
-    elseif recompute_modulus 
-        SSE["modulus"] = get_modulus(SSE["true stress"])
+    if !SSE["fixed modulus"] #only allowed to change if modulus is not fixed
+        if !isnothing(modulus)
+            SSE["modulus"] = modulus
+        elseif recompute_modulus 
+            SSE["modulus"] = get_modulus(SSE["true stress"])
+        end
     end
     
     SSE["hardening"] = get_hardening_portion(SSE["true stress"], 
