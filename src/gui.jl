@@ -743,7 +743,7 @@ function export_data(SSE;
         fext = ".png"
         fname3 = joinpath(output_folder, fname * "_plot" * fext)
         
-        fig = Figure()
+        fig = Figure(size = (1200,800))
         ax = initialize_axis(fig)
         update_stress_plot!(ax, SSE; N = SSE["export density"])
 

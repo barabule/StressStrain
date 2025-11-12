@@ -3,12 +3,16 @@
 function data_gui(parent_screen::GLMakie.Screen , fn::AbstractString, defaults = nothing::Union{Nothing, Dict};
                 sidebar_width = 300,
                 tooclose = 1e-6, #tolerance for too close strain points
+                readahead = 10, #how many lines to read before import
                 )
 
 
     fig = Figure()
 
     ax_plot = Axis(fig[1,1])
+
+    preread_file(ax_plot, fn, readahead)
+
     controls = GridLayout(fig[1,2], tellheight = false, width = sidebar_width)
 
     delim_list = zip(
@@ -216,4 +220,21 @@ function clean!(data, abnormal_indices; maxiter = 10)
 
     return nothing
 
+end
+
+
+function preread_file(ax, fn, numlines)
+
+    
+    nl = 0
+
+    for line in eachline(fn)
+        nl+=1
+        nl > numlines && break
+
+        text!(ax, 0.0, (numlines-nl+1)*10; text = line)
+        
+    end
+    
+    return nothing
 end
