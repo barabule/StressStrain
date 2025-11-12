@@ -198,6 +198,7 @@ function update_data_plot!(ax, data, abnormal = nothing)
     #color abnormal points in red
     if !isnothing(abnormal)
         scatter!(ax, data.strain[abnormal], data.stress[abnormal], 
+                        label = "Abnormal Points",
                         color = :red, 
                         marker= 'X',
                         markersize = 8)
