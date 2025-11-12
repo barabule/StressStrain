@@ -483,15 +483,15 @@ function initialize(data = nothing;
                     resample_density = 20,
                     )
 
-    if isnothing(data)
+    if isnothing(data) #make up something
         strain = LinRange(0, 0.1, 20)
         stress = 100.0 .* strain .^ 0.2
     else
         strain, stress = data
-        #@info "This" data
-        
     end
+
     SSE = get_initial_SSE(strain ,stress; resample_density)
+
     if haskey(data, :folder)
         SSE["export folder"] = data.folder
     end
@@ -543,10 +543,6 @@ function initialize(data = nothing;
         "Reg Smooth",
         "RambergOsgoodAlt"
     ]
-
-
-
-
 
     push!(SSE, "interpolant" => fitfuncs[1])
     push!(SSE, "hardening fit" => make_interpolant(SSE["interpolant"], SSE["hardening"]; alg))
@@ -605,7 +601,10 @@ function update_SSE!(SSE;
                                         offset = SSE["hardening offset"],
                                         E = SSE["modulus"],
                                         )
-
+        #update the true stress
+        SSE["true stress"] = (;strain = resampled_data[1],
+                                stress = resampled_data[2])
+                                        
     end
 
 
@@ -614,11 +613,11 @@ function update_SSE!(SSE;
                                                 offset = SSE["hardening offset"]
                                                 )
 
-    if isnothing(SSE["hardening"])
-        @show SSE["hardening offset"]
-        @show extrema(SSE["true stress"].strain)
-        @show SSE["modulus"]
-        error("Hardening Curve could not be extracted2!")
+    if isnothing(SSE["hardening"]) #how to handle this gracefully
+        @warn "Hardening portion cannot be extracted!"
+        @info "Modulus ", SSE["modulus"]
+        @info "Hardening offset ", SSE["hardening offset"]
+        
     end
     
     SSE["hardening fit"] = make_interpolant(SSE["interpolant"], SSE["hardening"]; alg)
