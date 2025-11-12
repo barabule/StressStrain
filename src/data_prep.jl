@@ -19,8 +19,6 @@ function true_to_engineering(SS)
 end
 
 
-
-
 function get_modulus(SS; 
                 max_strain = 1e-3, #consider strains up to max_strain for fitting
                 sigdigits = 2, #makes no sense to return E moduli with too much precision
@@ -46,6 +44,7 @@ function get_modulus(SS;
     return round(E; sigdigits)
 end
 
+
 function bracket_modulus(data;
                     sigdigits = 2)
     @assert haskey(data, :strain) && haskey(data, :stress) "Data must have fields strain and stress!"
@@ -64,7 +63,6 @@ function bracket_modulus(data;
     return (;Emin = round(Emin; sigdigits), 
              Emax = round(Emax; sigdigits))
 end
-
 
 
 function get_hardening_portion(SS, modulus = nothing;offset = 2e-3)
@@ -86,6 +84,7 @@ function get_hardening_portion(SS, modulus = nothing;offset = 2e-3)
     end
     #we reached the end and no point was found
 end
+
 
 function toein_compensate(ss;
                 cut = 0.0,
@@ -117,6 +116,7 @@ function toein_compensate(ss;
              stress = stressout)
 end
 
+
 function moving_average(A::AbstractArray, m::Int = 3)
     @assert m > 0 && isodd(m) "m must be greater than 0 and odd"
     out = similar(A)
@@ -133,7 +133,6 @@ function moving_average(A::AbstractArray, m::Int = 3)
     end
     return out
 end
-
 
 
 function decimate(xp, yp; rescale = true, tolerance=1e-3)
@@ -183,6 +182,7 @@ function DouglasPeucker!(resultlist, points, idx1, idx2; tolerance = 1e-3)
     end
     
 end
+
 
 function distance(P1, L1, L2)
     a = P1 - L1
@@ -251,7 +251,6 @@ function resample_curve(x, y, N::Integer=100;
 end
 
 
-
 function read_stress_strain_data(fn::AbstractString;
                         delim='\t',
                         skipstart = 0,
@@ -292,7 +291,6 @@ function cutoff(data, val)
     return data
 
 end
-
 
 
 function find_abnormal_points(data; tooclose = 1e-6)
