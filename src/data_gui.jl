@@ -123,8 +123,13 @@ function data_gui(parent_screen::GLMakie.Screen , fn::AbstractString, defaults =
     end
 
 
+    on(menu_delim.selection) do s
+        delim = s
+    end
+
     on(btn_import.clicks) do _
         try
+            @info "delim", delim[]
             data = read_stress_strain_data(fn;
                         delim = delim[], 
                         skipstart = skipstart[],
@@ -182,6 +187,7 @@ end
 
 
 function update_data_plot!(ax, data, abnormal = nothing)
+    isnothing(data) && return nothing #just in case
     @assert haskey(data, :strain) && haskey(data, :stress) "Data must have strain and stress fields!"
 
     empty!(ax)
@@ -205,7 +211,7 @@ function update_data_plot!(ax, data, abnormal = nothing)
     end
 
     axislegend(ax, position = :rb)
-
+    return nothing
 end
 
 function clean!(data, abnormal_indices; maxiter = 10)
