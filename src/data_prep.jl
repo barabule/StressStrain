@@ -77,11 +77,12 @@ function get_hardening_portion(SS, modulus = nothing;offset = 2e-3)
         ϵel = σ / E
         ϵpl = ϵ - ϵel
         if ϵpl > offset
-            return (;strain = SS.strain[i:end] .- ϵel,
+            return (;strain = SS.strain[i:end] .- SS.stress[i:end]./E,
                      stress = SS.stress[i:end])
         end
         
     end
+    return nothing
     #we reached the end and no point was found
 end
 
