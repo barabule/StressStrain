@@ -58,4 +58,10 @@
     @test hardening.stress[1] == data.stress[4]
 
 
+    #toein stuff
+    cut = 1e-2
+    toein = SS.toein_compensate(data; cut)
+    eel = toein.strain[2]
+    @test (last(data.strain) - cut + eel) ≈ last(toein.strain)
+
 end

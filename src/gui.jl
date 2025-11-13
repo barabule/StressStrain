@@ -118,8 +118,16 @@ function main(data = nothing;
                     width = sidebar_sub_width,
                     )
 
+    # max_elastic_range = SSE["max elastic range"]
 
+    # sld_elastic_range = Slider(fig,
+    #                 range = LinRange(0.0, max_elastic_range, 1000),
+    #                 startvalue = 1e-3,
+    #                 update_while_dragging = true,
+    #                 width = 0.4 * sidebar_sub_width,
+    #                 )
 
+    lab_elastic_range_val = Label(fig, "0.001")
 
     lab_modulus = Label(fig, "E = ")
 
@@ -137,7 +145,6 @@ function main(data = nothing;
                 
                 )
 
-
     cb_fixed = Checkbox(fig, checked = false)
     
     lab_offset = Label(fig, "Offset = $(round(sld_offset.value[]; sigdigits = 3))")
@@ -148,7 +155,8 @@ function main(data = nothing;
         hgrid!(lab_modulus, tb_modulus, Label(fig, "MPa")),
         sld_modulus,
         hgrid!(Label(fig, "Fix Modulus"), cb_fixed),
-        hgrid!(lab_offset, sld_offset)
+        # hgrid!(Label(fig, "Elastic range "), sld_elastic_range, lab_elastic_range_val),
+        hgrid!(lab_offset, sld_offset),
         ;
         width = sidebar_sub_width,
     )
@@ -263,6 +271,14 @@ function main(data = nothing;
         tb_modulus.displayed_string = "$(round(sld_modulus.value[]; sigdigits= 3))"
         update_status_label!(label_status, SSE)
     end
+
+    # on(sld_elastic_range.value) do val
+    #     SSE["elastic range"] = val
+    #     lab_elastic_range_val.text = string(round(val;sigdigits = 4))
+    #     update_SSE!(SSE)
+    #     update_stress_plot!(axss, SSE; N)
+    #     update_status_label!(label_status, SSE)
+    # end
 
     on(tb_modulus.stored_string) do s
         #update modulus only in the checkbox is unchecked
@@ -438,6 +454,8 @@ function update_stress_plot!(ax, SSE;
     lines!(ax, tlin, slin, linestyle = :dash, color = :red)
     #hardening offset
     lines!(ax, tlin .+ SSE["hardening offset"],slin, color = (:red, 0.3), linestyle = :solid )
+    #elastic range
+    # vlines!(ax, [SSE["elastic range"]], color = (:grey50, 0.5), linestyle = :solid)
     ### Cutoff limits
     vlines!(ax, [SSE["toein"], SSE["cut off"]], color= :black, linestyle = :dash)
 
@@ -461,6 +479,8 @@ function get_initial_SSE(strain, stress; resample_density = 20)
         "cut off" => last(strain), #cut off value for true stress curve    
         "export folder" => nothing,
         "fixed modulus"=> false, #if this is set, modulus cannot change
+        "elastic range" => 1e-3, #how much of the starting portion to use to compute modulus
+        "max elastic range" => 2e-3, #max strain value for elastic behavior 
         )
     
     push!(SSE, "modulus" => get_modulus(SSE["rawdata"]))
@@ -576,7 +596,10 @@ function update_SSE!(SSE;
     end
     
     if SSE["toein"]>0.0
-        RD = toein_compensate(SSE["rawdata"]; cut = SSE["toein"])
+        RD = toein_compensate(SSE["rawdata"]; 
+                                cut = SSE["toein"], 
+                                elastic_strain_offset = SSE["elastic range"],
+                            )
     else
         RD = SSE["rawdata"]
     end
@@ -589,7 +612,9 @@ function update_SSE!(SSE;
         if !isnothing(modulus)
             SSE["modulus"] = modulus
         elseif recompute_modulus 
-            SSE["modulus"] = get_modulus(SSE["true stress"])
+            SSE["modulus"] = get_modulus(SSE["true stress"]; 
+                                            max_strain = SSE["elastic range"],
+                                        )
         end
     end
     
@@ -612,6 +637,8 @@ function update_SSE!(SSE;
                                                 SSE["modulus"]; 
                                                 offset = SSE["hardening offset"]
                                                 )
+    #update allowable elastic range
+    SSE["max elastic range"] = first(SSE["hardening"].stress) / SSE["modulus"] - SSE["hardening offset"]
 
     if isnothing(SSE["hardening"]) #how to handle this gracefully
         @warn "Hardening portion cannot be extracted!"
@@ -758,3 +785,5 @@ function export_data(SSE;
 
     @info  "Done"
 end
+
+

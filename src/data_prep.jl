@@ -88,22 +88,37 @@ end
 
 
 function toein_compensate(ss;
-                cut = 0.0,
+                cut = 0.0, #cut at this strain
+                elastic_strain_offset = 0.0, #how much of the new curve to use to get a slope
+                min_slope = 1e-4, #smallest allowed slope 
                 )
 
     @assert haskey(ss, :strain) && haskey(ss, :stress) "ss must have fields strain and stress !"
+    
+    cut ≈ 0 && return ss #no need to do anything
+
 
     icut = findfirst(s -> s>cut, ss.strain)
 
-    icut == lastindex(ss.strain) || isnothing(icut) && return ss #fail
-    #this works only for smooth data...
-    next_slope = (ss.stress[icut+1] - ss.stress[icut]) / 
-                 (ss.strain[icut+1] - ss.strain[icut])
-    next_slope = clamp(next_slope, zero(next_slope), Inf) #no negative slope allowed
+    icut == lastindex(ss.strain) || isnothing(icut) && return nothing #fail
+    
+    #get the elastic portion of the cut curve
+    elastic_strain_offset = clamp(elastic_strain_offset, 0, Inf)
+    islope = findlast( e -> e <= cut + elastic_strain_offset, ss.strain)
+       
+    if elastic_strain_offset ≈ 0 || (islope <= icut) #just get the next slope
+        next_slope = (ss.stress[icut+1] - ss.stress[icut]) / 
+                    (ss.strain[icut+1] - ss.strain[icut])
+    else
+        next_slope = get_modulus((;strain = view(ss.strain, icut:islope), 
+                                    stress = view(ss.stress, icut:islope));
+                                    max_strain = elastic_strain_offset)
+    end
 
+    next_slope = clamp(next_slope, min_slope, Inf) #no negative or zero slope allowed    
     el_strain = ss.stress[icut] / next_slope
     offset_strain = ss.strain[icut] - el_strain
-    
+
     strainout = ss.strain[icut:end] .- offset_strain
     stressout = ss.stress[icut:end]
     #add 0,0 as first point, only if there's no 0,0 point...
