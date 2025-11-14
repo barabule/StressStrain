@@ -72,35 +72,44 @@ function get_hardening_portion(SS, modulus = nothing;offset = 2e-3)
         E = modulus
     end
     @assert haskey(SS, :strain) && haskey(SS, :stress) "SS must have fields strain and stress !"
-    for i in 1:length(SS.strain)
+
+    plastic_strain = Vector{eltype(SS.strain)}()
+    effective_stress = Vector{eltype(SS.stress)}()
+
+    
+    for i in eachindex(SS.strain)
         ϵ, σ = SS.strain[i], SS.stress[i]
         ϵel = σ / E
         ϵpl = ϵ - ϵel
         if ϵpl > offset
-            return (;strain = SS.strain[i:end] .- SS.stress[i:end]./E,
-                     stress = SS.stress[i:end])
-        end
-        
+            push!(plastic_strain, ϵpl)
+            push!(effective_stress, σ)
+        end    
     end
-    return nothing
-    #we reached the end and no point was found
+    #this is sometimes needed for noisy data
+    sorted_idx = sortperm(plastic_strain)
+
+    return (;strain =  plastic_strain[sorted_idx],
+            stress = effective_stress[sorted_idx])
 end
 
 
 function toein_compensate(ss;
                 cut = 0.0, #cut at this strain
-                elastic_strain_offset = 0.0, #how much of the new curve to use to get a slope
-                min_slope = 1e-4, #smallest allowed slope 
+                elastic_strain_offset = 1e-3, #how much of the new curve to use to get a slope
+                min_slope = -Inf, #smallest allowed slope 
                 )
 
     @assert haskey(ss, :strain) && haskey(ss, :stress) "ss must have fields strain and stress !"
     
+    min_slope = max(min_slope, last(ss.stress)/last(ss.strain)) #E modulus cannot be < than last secant modulus
+
     cut ≈ 0 && return ss #no need to do anything
 
 
-    icut = findfirst(s -> s>cut, ss.strain)
+    icut = findfirst(s -> s >= cut, ss.strain)
 
-    icut == lastindex(ss.strain) || isnothing(icut) && return nothing #fail
+    icut == lastindex(ss.strain) || isnothing(icut) && return ss #fail
     
     #get the elastic portion of the cut curve
     elastic_strain_offset = clamp(elastic_strain_offset, 0, Inf)
@@ -112,7 +121,7 @@ function toein_compensate(ss;
     else
         next_slope = get_modulus((;strain = view(ss.strain, icut:islope), 
                                     stress = view(ss.stress, icut:islope));
-                                    max_strain = elastic_strain_offset)
+                                    max_strain = ss.stress[islope])
     end
 
     next_slope = clamp(next_slope, min_slope, Inf) #no negative or zero slope allowed    

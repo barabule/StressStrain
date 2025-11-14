@@ -1,6 +1,7 @@
 
 
 function main(data = nothing; 
+                clean_data = true, #if called directly with some data
                 import_defaults = nothing,
                 N=1000,
                 sidebar_width = 300,
@@ -31,6 +32,9 @@ function main(data = nothing;
     sidebar_sub_width = subscale * sidebar_width
     bottom_panel_sub_height = subscale * bottom_panel_height
 
+    if clean_data
+        clean!(data)
+    end
 
     SSE, fitfuncs, fitfunclabels, resamplefuncs, resamplefunclabels = initialize(data; resample_density)
 
@@ -118,14 +122,14 @@ function main(data = nothing;
                     width = sidebar_sub_width,
                     )
 
-    # max_elastic_range = SSE["max elastic range"]
+    max_elastic_range = SSE["max elastic range"]
 
-    # sld_elastic_range = Slider(fig,
-    #                 range = LinRange(0.0, max_elastic_range, 1000),
-    #                 startvalue = 1e-3,
-    #                 update_while_dragging = true,
-    #                 width = 0.4 * sidebar_sub_width,
-    #                 )
+    sld_elastic_range = Slider(fig,
+                    range = LinRange(0.0, max_elastic_range, 1000),
+                    startvalue = 1e-3,
+                    update_while_dragging = true,
+                    width = 0.4 * sidebar_sub_width,
+                    )
 
     lab_elastic_range_val = Label(fig, "0.001")
 
@@ -139,9 +143,9 @@ function main(data = nothing;
 
 
     sld_offset = Slider(fig,
-                range= LinRange(0.0, 0.1, 101),
+                range= LinRange(1e-3, 0.1, 100),
                 startvalue = 2e-3,
-                update_while_dragging = true,
+                update_while_dragging = false,
                 
                 )
 
@@ -155,7 +159,7 @@ function main(data = nothing;
         hgrid!(lab_modulus, tb_modulus, Label(fig, "MPa")),
         sld_modulus,
         hgrid!(Label(fig, "Fix Modulus"), cb_fixed),
-        # hgrid!(Label(fig, "Elastic range "), sld_elastic_range, lab_elastic_range_val),
+        hgrid!(Label(fig, "Elastic range "), sld_elastic_range, lab_elastic_range_val),
         hgrid!(lab_offset, sld_offset),
         ;
         width = sidebar_sub_width,
@@ -272,13 +276,13 @@ function main(data = nothing;
         update_status_label!(label_status, SSE)
     end
 
-    # on(sld_elastic_range.value) do val
-    #     SSE["elastic range"] = val
-    #     lab_elastic_range_val.text = string(round(val;sigdigits = 4))
-    #     update_SSE!(SSE)
-    #     update_stress_plot!(axss, SSE; N)
-    #     update_status_label!(label_status, SSE)
-    # end
+    on(sld_elastic_range.value) do val
+        SSE["elastic range"] = val
+        lab_elastic_range_val.text = string(round(val;sigdigits = 4))
+        update_SSE!(SSE)
+        update_stress_plot!(axss, SSE; N)
+        update_status_label!(label_status, SSE)
+    end
 
     on(tb_modulus.stored_string) do s
         #update modulus only in the checkbox is unchecked
@@ -455,7 +459,7 @@ function update_stress_plot!(ax, SSE;
     #hardening offset
     lines!(ax, tlin .+ SSE["hardening offset"],slin, color = (:red, 0.3), linestyle = :solid )
     #elastic range
-    # vlines!(ax, [SSE["elastic range"]], color = (:grey50, 0.5), linestyle = :solid)
+    vlines!(ax, [SSE["elastic range"]], color = (:grey50, 0.5), linestyle = :solid)
     ### Cutoff limits
     vlines!(ax, [SSE["toein"], SSE["cut off"]], color= :black, linestyle = :dash)
 
@@ -480,7 +484,7 @@ function get_initial_SSE(strain, stress; resample_density = 20)
         "export folder" => nothing,
         "fixed modulus"=> false, #if this is set, modulus cannot change
         "elastic range" => 1e-3, #how much of the starting portion to use to compute modulus
-        "max elastic range" => 2e-3, #max strain value for elastic behavior 
+        "max elastic range" => last(strain), #max strain value for elastic behavior 
         )
     
     push!(SSE, "modulus" => get_modulus(SSE["rawdata"]))
@@ -492,7 +496,6 @@ function get_initial_SSE(strain, stress; resample_density = 20)
         )
 
     push!(SSE, "export max strain" => maximum(SSE["rawdata"].strain))
-
 
     return SSE
 end
@@ -565,6 +568,12 @@ function initialize(data = nothing;
     ]
 
     push!(SSE, "interpolant" => fitfuncs[1])
+
+    if !issorted(SSE["hardening"].strain)
+        @warn "strain is not sorted", SSE["hardening"].strain[1:100]
+        @info "E modulus", SSE["modulus"]
+    end
+
     push!(SSE, "hardening fit" => make_interpolant(SSE["interpolant"], SSE["hardening"]; alg))
     
     return (;SSE, fitfuncs, fitfunclabels, resamplefuncs, resamplefunclabels)
@@ -638,7 +647,7 @@ function update_SSE!(SSE;
                                                 offset = SSE["hardening offset"]
                                                 )
     #update allowable elastic range
-    SSE["max elastic range"] = first(SSE["hardening"].stress) / SSE["modulus"] - SSE["hardening offset"]
+    SSE["max elastic range"] = last(SSE["true stress"].strain)
 
     if isnothing(SSE["hardening"]) #how to handle this gracefully
         @warn "Hardening portion cannot be extracted!"

@@ -174,7 +174,9 @@ function data_gui(parent_screen::GLMakie.Screen , fn::AbstractString, defaults =
             defaults[:strain_mult] = strain_mult[]
             defaults[:stress_mult] = stress_mult[]
 
-            main(data; import_defaults = defaults)
+            main(data;
+                clean_data = false,
+                import_defaults = defaults)
             
         end
 
@@ -214,8 +216,10 @@ function update_data_plot!(ax, data, abnormal = nothing)
     return nothing
 end
 
-function clean!(data, abnormal_indices; maxiter = 10)
-  
+function clean!(data, abnormal_indices = nothing; maxiter = 10)
+    if isnothing(abnormal_indices)
+        abnormal_indices = find_abnormal_points(data)
+    end
     for _ in 1:maxiter
         isempty(abnormal_indices) && break
         deleteat!(data.strain, abnormal_indices)
