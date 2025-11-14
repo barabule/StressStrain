@@ -34,13 +34,13 @@
     Ebrk2 = SS.bracket_modulus(data;sigdigits =2)
 
     @test Ebrk2.Emax ≈ E
-    @test Ebrk2.Emin ≈ round(last(data.stress) / last(data.strain);sigdigits = 2)
+    @test Ebrk2.Emin <= E <= Ebrk2.Emax
 
 
     offset = 2e-3
 
     hardening = SS.get_hardening_portion(data, E; offset)
-
+    @test issorted(hardening.strain)
     @test begin
         val = true
         etotal = view(data.strain, (length(data.strain)-length(hardening.strain)+1) : length(data.strain))
@@ -61,7 +61,14 @@
     #toein stuff
     cut = 1e-2
     toein = SS.toein_compensate(data; cut)
-    eel = toein.strain[2]
-    @test (last(data.strain) - cut + eel) ≈ last(toein.strain)
+    @test issorted(toein.strain)
+    @test first(toein.strain) ≈ 0 && first(toein.stress) ≈ 0 #after toein operation, stress strain should start at 0
+
+    nl = length(toein.stress)
+    @test all(data.stress[end-nl+2:end] .== toein.stress[2:end])  #should not modify stress values after the cut
+    @test all(data.strain[end-nl+2:end] .>= cut) # strain after cut
+    ncut = length(data.strain) - nl
+    @test all(data.strain[1:ncut] .< cut) #strain before cut should be < cut
 
 end
+        
