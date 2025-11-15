@@ -20,29 +20,24 @@ function cubic_bezier_point(t::Real, P0, P1, P2, P3)
 end
 
 # Function to generate the piecewise cubic Bézier curve points
-function piecewise_cubic_bezier(control_points::Vector{Point2f}, N_segments=50)
-    curve_points = Point2f[]
+function piecewise_cubic_bezier(control_points::Vector{PT}; 
+                                N_segments=50) where PT
+    curve_points = PT[]
     n_points = length(control_points)
 
-    # A piecewise cubic Bézier requires 4 points (P₀, P₁, P₂, P₃) for each segment.
-    # The total number of points must be 4 + 3k where k is the number of extra segments
-    # (i.e., n_points = 4, 7, 10, ...).
-    # The start/end of a segment are the end points (P0, P3). The two middle points (P1, P2) are the
-    # control handles.
-
-    # Check for enough points to form at least one cubic segment (4 points)
     if n_points < 4
         return curve_points
     end
 
-    # The number of segments is (n_points - 1) / 3. The control point indices for segment 'k'
-    # will be 3k, 3k+1, 3k+2, 3k+3 (assuming 0-indexing for segments).
-    num_segments = div(n_points - 1, 3) # integer division
+    num_segments = div(n_points - 1, 3) 
 
     for k in 0:(num_segments - 1)
-        # 1-based indexing for control_points array
+        
         idx = 3 * k + 1
-        P0, P1, P2, P3 = control_points[idx], control_points[idx + 1], control_points[idx + 2], control_points[idx + 3]
+        P0, P1, P2, P3 = control_points[idx], 
+                        control_points[idx + 1], 
+                        control_points[idx + 2], 
+                        control_points[idx + 3]
 
         # Generate points for this segment
         for i in 0:N_segments
@@ -54,7 +49,7 @@ function piecewise_cubic_bezier(control_points::Vector{Point2f}, N_segments=50)
     return curve_points
 end
 
-# --- 2. Setup Plot and Observables ---
+
 function interactive_bezier_curve()
     # Initial control points (must be a multiple of 3 + 1 for cubic segments, e.g., 4, 7, 10...)
     initial_cpoints = Point2f[
@@ -195,5 +190,124 @@ function interactive_bezier_curve()
     display(fig)
 end
 
-# To run the function:
-# interactive_bezier_curve()
+
+function add_bezier_segment!(vertices, mousepos)
+    #identify where to put new point
+    
+    
+    tclosest = find_closest_point(vertices, mousepos) #closest point on control polygon to mouseposition
+    i1, i2 = get_enclosing_segment(crv, tclosest) #indices of control vertices before and after
+    V1, V2 = vertices[i1], vertices[i2]
+    
+    C1 = 0.25 * V1 + 0.75 * V2
+    C2 = 0.50 * V1 + 0.50 * V2
+    C3 = 0.75 * V1 + 0.25 * V2 
+
+    vertices = vcat(vertices[1:i1], C1, C2, C3, vertices[i2:end])
+    return nothing
+end
+
+
+function remove_bezier_segment!(crv, mousepos)
+    vertices = crv.vertices
+    length(vertices) <= 4 && return nothing #
+    pt_on_curve, i1, i2 = find_closest_point(vertices, mousepos)
+    
+
+    iclosest = norm(pt_on_curve - vertices[i1])>= norm(pt_on_curve - vertices[i2]) ? i1 : i2
+    if iclosest==firstindex(vertices)
+        deleteat!(vertices, (1,2))
+    elseif iclosest==lastindex(vertices)
+        deleteat!(vertices, (iclosest-1, iclosest))
+    else
+        deleteat!(vertices, [iclosest-1, iclosest, iclosest+1])
+    end
+    return nothing
+end
+
+
+function find_closest_point(vertices, point) 
+    
+    CP = @view vertices[1:3:end]
+    tclosest = -Inf
+    bestfound = nothing
+    seg = (-1, -1)
+    for i in 2:length(CP)
+        C1, C2 = CP[i-1], CP[i]
+        C3, t = closest_point_to_line_segment(C1, C2, point)
+        if 0<=t<=1
+            return (C3, i-1, i)
+        else
+            if abs(t)<tclosest
+                tclosest, bestfound = abs(t), C3
+                seg = (i-1, i)
+            end
+        end
+
+    end
+    return (bestfound, seg...)
+end
+
+function closest_point_to_line_segment(L1, L2, P) #closest pt 
+    PL1 = P - L1
+    L21 = L2 - L1
+
+    nL21 = norm(L21)
+    nPL1 = norm(PL1)
+
+    Q = L1 + dot(PL1, L21) * L21 / (nL21 * nPL1)
+    t = (Q[1] - L2[1]) / (L1[1] - L2[1]) 
+    if isinf(t)
+        t = (Q[2] - L2[2]) / (L1[2] - L2[2])
+    end
+    return (Q, t)
+end
+
+function move_control_vertices(crv, idx, new_pos)
+    vertices = crv.vertices
+    old_pos = vertices[idx]
+    vertices[idx] = new_pos #move the vertex to new_pos
+
+    #case 1  - the moved vertex is a main control vertex
+    # move all attached vertices by the same amount to preserve tangency
+    if is_main_vertex(vertices, idx)
+        if idx== firstindex(vertices)
+            attached = (idx+1)
+        elseif idx == lastindex(vertices)
+            attached = (idx-1)
+        else
+            attached = (idx-1, idx+1)
+        end
+        dmove = new_pos - old_pos
+        for i in attached
+            vertices[i] += dmove
+        end
+        return nothing
+    end
+
+    #case 2 the moved vertex is a secondary control vertex
+    #rotate around the nearest main vertex the sec. vertex across the main 
+    if idx-1 == firstindex(vertices) || idx + 1 == lastindex(vertices) #nothing to do
+        return nothing
+    end
+
+    if is_main_vertex(vertices, idx-1)
+        center = vertices[idx-1]
+        V = vertices[idx-2]
+        idnext = idx-2
+    else
+        center = vertices[idx+1]
+        V = vertices[idx+2]
+        idnext = idx+2
+    end
+    L = norm(V-center)
+    vertices[idnext] = normalize(center - vertices[idx]) * L 
+    return nothing
+end
+
+
+function is_main_vertex(vertices, idx)
+    @assert firstindex(vertices) <= idx <= lastindex(vertices)
+    i = mod(idx, 3) #1 2 0 1 2 0 1 -> 1, 4, 7
+    return i==1
+end
