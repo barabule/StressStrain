@@ -98,10 +98,14 @@ function main(data = nothing;
 
     btn_reset = Button(fig, label = "Reset!")
 
+    btn_bspline_plus = Button(fig, label="+")
+    btn_bspline_minus = Button(fig, label = "-")
+    lab_bspline_control_pts = Label(fig, "4")
+
     true_stress_gl_sub[1,1] = vgrid!(
                     Label(fig, "True Stress Curve", fontsize = 20, font =:italic),
                     Label(fig, "Resample Function", width = nothing),
-                    resample_menu,
+                    hgrid!(resample_menu, btn_bspline_plus, lab_bspline_control_pts, btn_bspline_minus),
                     hgrid!(Label(fig, "Resample"), tb_resample),
                     btn_reset,
     ;
@@ -347,6 +351,27 @@ function main(data = nothing;
         update_stress_plot!(axss, SSE)
     end
 
+    on(btn_bspline_plus.clicks) do _
+        nc = SSE["BSpline approximation knots"]
+        nc += 1
+        SSE["BSpline approximation knots"] = nc
+        lab_bspline_control_pts.text = string(nc)
+        update_SSE!(SSE)
+        update_stress_plot!(axss, SSE)
+        update_status_label!(label_status, SSE)
+    end
+
+    on(btn_bspline_minus.clicks) do _ 
+        nc = SSE["BSpline approximation knots"]
+        nc = max(4, nc - 1)
+        SSE["BSpline approximation knots"] = nc
+        lab_bspline_control_pts.text = string(nc)
+        update_SSE!(SSE)
+        update_stress_plot!(axss, SSE)
+        update_status_label!(label_status, SSE)
+    end
+
+
 
     on(tb_resample.stored_string) do s
         SSE["resample density"] = clamp(parse(Int, s), 2, 10_000)
@@ -420,7 +445,7 @@ function update_stress_plot!(ax, SSE;
     #original data
     if haskey(SSE, "original data")
         OD = SSE["original data"]
-        scatter!(ax, OD.strain, OD.stress, color = (:grey90, 0.1), markersize = 1)
+        scatter!(ax, OD.strain, OD.stress, color = (:grey90, 0.7), markersize = 10, label = "original")
     end
     #rawdata
     tss = SSE["true stress"]
@@ -485,6 +510,8 @@ function get_initial_SSE(strain, stress; resample_density = 20)
         "fixed modulus"=> false, #if this is set, modulus cannot change
         "elastic range" => 1e-3, #how much of the starting portion to use to compute modulus
         "max elastic range" => last(strain), #max strain value for elastic behavior 
+        "BSpline approximation knots" => 4, #how many control points for BSpline approx
+        "BSpline degree" => 3, 
         )
     
     push!(SSE, "modulus" => get_modulus(SSE["rawdata"]))
@@ -596,7 +623,7 @@ function update_SSE!(SSE;
             resampled_data = resample_curve(RD.strain, RD.stress, SSE["resample density"];
                                     resampler = SSE["resampler"],
                                     d =3,
-                                    h = clamp(round(Int, length(RD.strain)/10), 4, 20),
+                                    h = SSE["BSpline approximation knots"],
                                     )
 
             SSE["rawdata"] = (;strain = resampled_data[1], 
