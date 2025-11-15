@@ -90,7 +90,7 @@ function main(data = nothing;
     ############### True Stress
 
     resample_menu = Menu(fig, options = zip(resamplefunclabels, resamplefuncs),
-                                default = "Linear")
+                                default = "Linear", width = sidebar_sub_width * 0.5)
 
     tb_resample = Textbox(fig, placeholder = "Enter number",
                     validator = Int, tellwidth = false,
@@ -102,6 +102,7 @@ function main(data = nothing;
     btn_bspline_minus = Button(fig, label = "-")
     lab_bspline_control_pts = Label(fig, "4")
 
+    
     true_stress_gl_sub[1,1] = vgrid!(
                     Label(fig, "True Stress Curve", fontsize = 20, font =:italic),
                     Label(fig, "Resample Function", width = nothing),
@@ -185,6 +186,8 @@ function main(data = nothing;
                         halign=:left,
                         boxcolor = :white,
                         )
+
+    
 
     hardening_gl_sub[1,1] = vgrid!(
             Label(fig, "Hardening Curve", fontsize = 20, font =:italic),
@@ -317,6 +320,8 @@ function main(data = nothing;
         update_status_label!(label_status, SSE)
         update_stress_plot!(axss, SSE; N)
     end
+
+
 
     on(resample_menu.selection) do s
         #TODO better handling of modulus update when fitting on true stress

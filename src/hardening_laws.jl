@@ -143,7 +143,8 @@ function make_interpolant(func, data; alg = NelderMead())
         lb = zeros(5)
         ub = fill(Inf, 5)
         return Curvefit(data.stress, data.strain, func, p0, alg, true, lb, ub; extrapolate = true)
-    elseif func == LinearInterpolation || func == CubicSpline || func == PCHIPInterpolation
+    elseif func == LinearInterpolation || func == CubicSpline || func == PCHIPInterpolation ||
+                func == AkimaInterpolation
         return func(data.stress, data.strain; extrapolation = ExtrapolationType.Linear)
     elseif func == BSplineApprox
         return func(data.stress, data.strain, 3, 4, :ArcLen, :Average; extrapolation = ExtrapolationType.Linear)
