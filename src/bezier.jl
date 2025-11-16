@@ -42,7 +42,11 @@ function bezier_fit_fig(data = nothing;
     bezier_curve = lift(cpoints) do pts
         curve = piecewise_cubic_bezier(pts)
         if !isnothing(results)
-            results["bezier fit"] => curve
+            if haskey(results, "bezier fit")
+                results["bezier fit"] => curve
+            else
+                push!(results, "bezier fit"=> curve)
+            end
         end
         curve
     end
