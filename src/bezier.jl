@@ -21,24 +21,28 @@ function bezier_fit_fig(data = nothing;
             Point2f(7, 1), Point2f(8, 2), Point2f(10, 0)                  # Second segment
         ]
     else
+
         strain = data.strain
         stress = data.stress
         min_strain, max_strain = extrema(strain)
         min_stress, max_stress = extrema(stress)
+        strain = collect(strain) ./max_strain
+        stress = collect(stress) ./max_stress 
+        push!(results, "scale factors"=> (;max_strain, max_stress))
         P1 = Point2f(0, 0)
         P4 = Point2f(last(strain), last(stress))
 
         mp = findfirst(x-> x>0.2*max_strain, strain)
-        P2 = Point2f(strain[mp], stress[mp])
+        P2 = Point2f(strain[mp], 1.4 * stress[mp])
         mp = findfirst(x -> x> 0.8 * max_strain, strain)
-        P3 = Point2f(strain[mp], stress[mp])
+        P3 = Point2f(strain[mp], 1.4 * stress[mp])
 
         initial_cpoints = Point2f[P1, P2, P3, P4]
     end
-    # Observable to store and reactively update the control points
+    
     cpoints = Observable(initial_cpoints) 
     
-    # Reactive transformation: recalculate the curve whenever cpoints changes
+    
     bezier_curve = lift(cpoints) do pts
         curve = piecewise_cubic_bezier(pts)
         if !isnothing(results)
@@ -51,7 +55,7 @@ function bezier_fit_fig(data = nothing;
         curve
     end
 
-    # Setup the figure, axis
+    
     fig = Figure()
     ax = Axis(fig[1, 1], title = "Interactive Piecewise Cubic Bézier Curve",
                 # aspect = DataAspect(), #maybe not needed
@@ -62,13 +66,13 @@ function bezier_fit_fig(data = nothing;
 
     #plot the data
     if !isnothing(data)
-        scatter!(ax, data.strain, data.stress, color= :grey50, alpha=0.5, label = "Data")
+        scatter!(ax, strain, stress, color= :grey50, alpha=0.5, label = "Data")
     end
 
-    # Plot the final Bézier curve
+    # final Bézier curve
     lines!(ax, bezier_curve, color = :black, linewidth = 4, label = "Bézier Curve")
 
-    # Plot the control polygon (connecting control points)
+    # control polygon
     lines!(ax, cpoints, color = (:grey, 0.5), linestyle = :dash, label = "Control Polygon")
 
     #control pts
@@ -103,7 +107,7 @@ function bezier_fit_fig(data = nothing;
     on(events(fig).mouseposition, priority = 10) do mp
         if dragged_index[] !== nothing && ispressed(fig, Mouse.left)
             # Convert mouse position (in pixels) to data coordinates
-            # This is key for plotting on an Axis
+            
             # dragged_index[] == 1 && return Consume(true) #fixed 1st point
             new_data_pos = Makie.mouseposition(ax.scene)
             
