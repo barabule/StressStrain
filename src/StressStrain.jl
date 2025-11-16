@@ -8,8 +8,10 @@ import GLMakie.GLFW
 
 include("data_prep.jl")
 include("hardening_laws.jl")
+include("bezier.jl")
 include("data_gui.jl")
 include("gui.jl")
+
 
 export engineering_to_true, true_to_engineering
 export get_modulus

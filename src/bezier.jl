@@ -1,50 +1,81 @@
 module BezierPath
 
 using GLMakie
+import GLMakie.GLFW
 using Observables
 using LinearAlgebra
 
-export interactive_bezier_curve_demo
 
-function interactive_bezier_curve_demo(;
+
+function bezier_fit_fig(data = nothing;
+                                results = Dict{String, Any}("bezier fit" => nothing)::Union{Nothing, Dict},#kinda pointless
                                 PICK_THRESHOLD = 20,
                                 )
-    # Initial control points (must be a multiple of 3 + 1 for cubic segments, e.g., 4, 7, 10...)
-    initial_cpoints = Point2f[
-        Point2f(0, 0), Point2f(1, 3), Point2f(3, -1), Point2f(5, 0), # First segment
-        Point2f(7, 1), Point2f(8, 2), Point2f(10, 0)                  # Second segment
-    ]
-    
+
+     
+    if isnothing(data)  
+        @info "data is nothing"                          
+        # Initial control points (must be a multiple of 3 + 1 for cubic segments, e.g., 4, 7, 10...)
+        initial_cpoints = Point2f[
+            Point2f(0, 0), Point2f(1, 3), Point2f(3, -1), Point2f(5, 0), # First segment
+            Point2f(7, 1), Point2f(8, 2), Point2f(10, 0)                  # Second segment
+        ]
+    else
+        strain = data.strain
+        stress = data.stress
+        min_strain, max_strain = extrema(strain)
+        min_stress, max_stress = extrema(stress)
+        P1 = Point2f(0, 0)
+        P4 = Point2f(last(strain), last(stress))
+
+        mp = findfirst(x-> x>0.2*max_strain, strain)
+        P2 = Point2f(strain[mp], stress[mp])
+        mp = findfirst(x -> x> 0.8 * max_strain, strain)
+        P3 = Point2f(strain[mp], stress[mp])
+
+        initial_cpoints = Point2f[P1, P2, P3, P4]
+    end
     # Observable to store and reactively update the control points
     cpoints = Observable(initial_cpoints) 
     
     # Reactive transformation: recalculate the curve whenever cpoints changes
     bezier_curve = lift(cpoints) do pts
-        piecewise_cubic_bezier(pts)
+        curve = piecewise_cubic_bezier(pts)
+        if !isnothing(results)
+            results["bezier fit"] => curve
+        end
+        curve
     end
 
     # Setup the figure, axis
     fig = Figure()
     ax = Axis(fig[1, 1], title = "Interactive Piecewise Cubic Bézier Curve",
-                aspect = DataAspect())
+                # aspect = DataAspect(), #maybe not needed
+                )
 
     #
     deregister_interaction!(ax, :rectanglezoom)
+
+    #plot the data
+    if !isnothing(data)
+        scatter!(ax, data.strain, data.stress, color= :grey50, alpha=0.5, label = "Data")
+    end
+
     # Plot the final Bézier curve
-    lines!(ax, bezier_curve, color = :blue, linewidth = 4, label = "Bézier Curve")
+    lines!(ax, bezier_curve, color = :black, linewidth = 4, label = "Bézier Curve")
 
     # Plot the control polygon (connecting control points)
     lines!(ax, cpoints, color = (:grey, 0.5), linestyle = :dash, label = "Control Polygon")
 
-    # Plot the interactive control points as a scatter plot
+    #control pts
     scatter_plot = scatter!(ax, cpoints, markersize = 15, color = :red, strokecolor = :black, strokewidth = 1, marker = :circle, label = "Control Points")
 
     # --- 3. Interactivity: Dragging Control Points ---
     # Find the index of the closest control point when the mouse is pressed
     dragged_index = Observable{Union{Nothing, Int}}(nothing)
     
-    # Threshold for point selection (in pixels)
-     
+    
+     ##################################EVENTS###########################################################################
 
     # Interaction for pressing the mouse button
     on(events(fig).mousebutton, priority = 10) do event
@@ -69,6 +100,7 @@ function interactive_bezier_curve_demo(;
         if dragged_index[] !== nothing && ispressed(fig, Mouse.left)
             # Convert mouse position (in pixels) to data coordinates
             # This is key for plotting on an Axis
+            # dragged_index[] == 1 && return Consume(true) #fixed 1st point
             new_data_pos = Makie.mouseposition(ax.scene)
             
             # Update the specific control point's position
@@ -92,9 +124,8 @@ function interactive_bezier_curve_demo(;
         return Consume(false)
     end
 
-    # --- 4. Functionality: Add, Remove, End Curve ---
-    # Key binding for adding a control point (e.g., 'a')
-    # This will place the new point at the current mouse position
+    
+    
     on(events(fig).keyboardbutton, priority = 10) do event
         if event.action == Keyboard.press
             current_points = cpoints[]
@@ -125,15 +156,9 @@ function interactive_bezier_curve_demo(;
     fig[1, 2] = Legend(fig, ax)
 
     # Display the figure
-    display(fig)
+    screen = GLMakie.Screen()
+    display(screen, fig)
 end
-
-
-
-
-
-
-
 
 function cubic_bezier_point(t::Real, P0, P1, P2, P3)
     # The standard cubic Bézier formula: B(t) = (1-t)³P₀ + 3(1-t)²tP₁ + 3(1-t)t²P₂ + t³P₃
@@ -163,6 +188,7 @@ function piecewise_cubic_bezier(control_points::Vector{PT};
     num_segments = div(n_points - 1, 3)
 
     cache = zeros(PT, N_segments+1)
+    ti = (0:N_segments) * (1/N_segments) #reusable
     for k in 0:(num_segments - 1)
         
         idx = 3 * k + 1
@@ -173,7 +199,7 @@ function piecewise_cubic_bezier(control_points::Vector{PT};
 
         # Generate points for this segment
         for i in 0:N_segments
-            t = i / N_segments
+            t = ti[i+1]
             cache[i+1] = cubic_bezier_point(t, P0, P1, P2, P3)
         end
         push!(curve_points, cache...)
@@ -188,8 +214,6 @@ end
 
 function add_bezier_segment!(vertices, mousepos)
     #identify where to put new point
-    
-    
     Q, i1, i2 = find_closest_main_segment_horizontal(vertices, mousepos) #closest point on control polygon to mouseposition
     @info "Q", Q, "i1 ", i1, " i2 ", i2
     V1, V2 = vertices[i1+1], vertices[i2-1] #closest control verts
@@ -276,8 +300,8 @@ end
 
 function find_closest_main_segment(vertices, P) 
     
-    numpts = div(length(vertices)-1, 3)
-    num_segments = numpts-1
+    
+    num_segments = div(length(vertices)-1, 3)
     dmin = Inf
     Qbest = P
     idxbest = (1, 4) #default
@@ -323,7 +347,9 @@ function move_control_vertices!(vertices, idx, new_pos)
     old_pos = vertices[idx]
     vertices[idx] = new_pos #move the vertex to new_pos
 
-    #case 1  - the moved vertex is a main control vertex
+
+    #basically behaves like Inkscape
+    #case 1  - the moved vertex is a main control vertex (interpolating point)
     # move all attached vertices by the same amount to preserve tangency
     if is_main_vertex(vertices, idx)
         if idx== firstindex(vertices)
@@ -356,7 +382,7 @@ function move_control_vertices!(vertices, idx, new_pos)
         idnext = idx+2
     end
     L = norm(V-center)
-    vertices[idnext] = normalize(center - vertices[idx]) * L + center
+    vertices[idnext] = normalize(center - vertices[idx]) * L + center #preserve the segment length
     return nothing
 end
 
