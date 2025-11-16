@@ -1,56 +1,14 @@
+module BezierPath
+
 using GLMakie
 using Observables
+using LinearAlgebra
 
+export interactive_bezier_curve_demo
 
-#### AI generated
-
-# --- 1. Bézier Curve Calculation ---
-# A function to calculate a point on a cubic Bézier segment
-# P0, P1, P2, P3 are the four control points (Points)
-function cubic_bezier_point(t::Real, P0, P1, P2, P3)
-    # The standard cubic Bézier formula: B(t) = (1-t)³P₀ + 3(1-t)²tP₁ + 3(1-t)t²P₂ + t³P₃
-    a = 1 - t
-    b = a * a
-    c = b * a
-    w0 = c
-    w1 = 3 * b * t
-    w2 = 3 * a * t^2
-    w3 = t^3
-    return P0 * w0 + P1 * w1 + P2 * w2 + P3 * w3
-end
-
-# Function to generate the piecewise cubic Bézier curve points
-function piecewise_cubic_bezier(control_points::Vector{PT}; 
-                                N_segments=50) where PT
-    curve_points = PT[]
-    n_points = length(control_points)
-
-    if n_points < 4
-        return curve_points
-    end
-
-    num_segments = div(n_points - 1, 3) 
-
-    for k in 0:(num_segments - 1)
-        
-        idx = 3 * k + 1
-        P0, P1, P2, P3 = control_points[idx], 
-                        control_points[idx + 1], 
-                        control_points[idx + 2], 
-                        control_points[idx + 3]
-
-        # Generate points for this segment
-        for i in 0:N_segments
-            t = i / N_segments
-            push!(curve_points, cubic_bezier_point(t, P0, P1, P2, P3))
-        end
-    end
-
-    return curve_points
-end
-
-
-function interactive_bezier_curve()
+function interactive_bezier_curve_demo(;
+                                PICK_THRESHOLD = 20,
+                                )
     # Initial control points (must be a multiple of 3 + 1 for cubic segments, e.g., 4, 7, 10...)
     initial_cpoints = Point2f[
         Point2f(0, 0), Point2f(1, 3), Point2f(3, -1), Point2f(5, 0), # First segment
@@ -67,8 +25,11 @@ function interactive_bezier_curve()
 
     # Setup the figure, axis
     fig = Figure()
-    ax = Axis(fig[1, 1], title = "Interactive Piecewise Cubic Bézier Curve")
+    ax = Axis(fig[1, 1], title = "Interactive Piecewise Cubic Bézier Curve",
+                aspect = DataAspect())
 
+    #
+    deregister_interaction!(ax, :rectanglezoom)
     # Plot the final Bézier curve
     lines!(ax, bezier_curve, color = :blue, linewidth = 4, label = "Bézier Curve")
 
@@ -83,7 +44,7 @@ function interactive_bezier_curve()
     dragged_index = Observable{Union{Nothing, Int}}(nothing)
     
     # Threshold for point selection (in pixels)
-    const PICK_THRESHOLD = 20
+     
 
     # Interaction for pressing the mouse button
     on(events(fig).mousebutton, priority = 10) do event
@@ -112,7 +73,7 @@ function interactive_bezier_curve()
             
             # Update the specific control point's position
             current_points = cpoints[]
-            current_points[dragged_index[]] = new_data_pos
+            move_control_vertices!(current_points, dragged_index[], new_data_pos)
             cpoints[] = current_points # Notify the Observable of the change
             
             # Consume the event to prevent other interactions from running
@@ -142,40 +103,17 @@ function interactive_bezier_curve()
                 # Check if we have a valid mouse position in data coordinates
                 data_pos = try Makie.mouseposition(ax.scene) catch; return Consume(false) end
                 
-                # Check for space to add a new *cubic segment*. 
-                # A new cubic segment requires 3 new points (P1, P2, P3) if starting from P0 of prev seg.
-                # A simpler "add control point" might just append, or insert after the last segment end.
-                # For this skeleton, we'll append a point where P3 of the last segment is.
-                # A proper implementation for adding a whole cubic segment is more complex:
-                # you'd likely want to add P1, P2, and P3, or calculate P1/P2 for a smooth C1/C2 continuation.
-                
-                # Simple append (not strictly piecewise cubic friendly unless adding P1, P2, P3)
-                # Let's add a placeholder to guide the user to add *three* points at once for a new segment.
-                # The user would have to hit 'a' three times to complete a segment.
-                # For this skeleton, we will implement adding a point at the end, 
-                # which will only form a new valid cubic segment if the user adds 3 more points.
-                
-                # Let's just add a point at the mouse position for flexibility. 
-                # The user is responsible for keeping the count (4, 7, 10...)
-                push!(current_points, data_pos)
+                add_bezier_segment!(current_points, data_pos)
+                # @info "current_points",current_points
                 cpoints[] = current_points
-                println("Added control point at $data_pos. Current points: $(length(current_points))")
                 return Consume(true)
             
-            elseif event.key == Keyboard.r # Remove last point
-                if length(current_points) > 0
-                    pop!(current_points)
-                    cpoints[] = current_points
-                    println("Removed last control point. Current points: $(length(current_points))")
-                    return Consume(true)
-                end
-            
-            elseif event.key == Keyboard.e # End / Clear curve
-                 # A basic "end" is just to clear the points for a new curve
-                cpoints[] = Point2f[] 
-                println("Curve ended/cleared.")
-                return Consume(true)
+            elseif event.key == Keyboard.d # delete closest main segment (removes 3 points from curve)
+                data_pos = try Makie.mouseposition(ax.scene) catch; return Consume(false) end
+                remove_bezier_segment!(current_points, data_pos)
+                cpoints[] = current_points
             end
+            
         end
         return Consume(false)
     end
@@ -191,80 +129,197 @@ function interactive_bezier_curve()
 end
 
 
+
+
+
+
+
+
+function cubic_bezier_point(t::Real, P0, P1, P2, P3)
+    # The standard cubic Bézier formula: B(t) = (1-t)³P₀ + 3(1-t)²tP₁ + 3(1-t)t²P₂ + t³P₃
+    a = 1 - t
+    b = a * a
+    c = b * a
+    w0 = c
+    w1 = 3 * b * t
+    w2 = 3 * a * t^2
+    w3 = t^3
+    return P0 * w0 + P1 * w1 + P2 * w2 + P3 * w3
+end
+
+# Function to generate the piecewise cubic Bézier curve points
+function piecewise_cubic_bezier(control_points::Vector{PT}; 
+                                N_segments=50, #how many sub-segments to draw for each segment
+                                ) where PT
+
+    curve_points = PT[]
+    n_points = length(control_points)
+
+    if n_points < 4
+        return curve_points
+    end
+
+    #total pts 3k+1 for k segments
+    num_segments = div(n_points - 1, 3)
+
+    cache = zeros(PT, N_segments+1)
+    for k in 0:(num_segments - 1)
+        
+        idx = 3 * k + 1
+        P0, P1, P2, P3 = control_points[idx], 
+                        control_points[idx + 1], 
+                        control_points[idx + 2], 
+                        control_points[idx + 3]
+
+        # Generate points for this segment
+        for i in 0:N_segments
+            t = i / N_segments
+            cache[i+1] = cubic_bezier_point(t, P0, P1, P2, P3)
+        end
+        push!(curve_points, cache...)
+    end
+
+    return curve_points
+end
+
+
+
+
+
 function add_bezier_segment!(vertices, mousepos)
     #identify where to put new point
     
     
-    tclosest = find_closest_point(vertices, mousepos) #closest point on control polygon to mouseposition
-    i1, i2 = get_enclosing_segment(crv, tclosest) #indices of control vertices before and after
-    V1, V2 = vertices[i1], vertices[i2]
+    Q, i1, i2 = find_closest_main_segment_horizontal(vertices, mousepos) #closest point on control polygon to mouseposition
+    @info "Q", Q, "i1 ", i1, " i2 ", i2
+    V1, V2 = vertices[i1+1], vertices[i2-1] #closest control verts
+    # @info "V1", V1, "V2", V2
+    PT = eltype(vertices)
+    C1 = PT(@. 0.75 * V1 + 0.25 * V2)
+    C2 = PT(@. 0.5 * V1 + 0.5 * V2)
+    C3 = PT(@. 0.25 * V1 + 0.75 * V2)
+    # @info "C1", C1, "C2", C2, "C3", C3
+    add_to_middle!(vertices, i1+2, (C1, C2, C3))
     
-    C1 = 0.25 * V1 + 0.75 * V2
-    C2 = 0.50 * V1 + 0.50 * V2
-    C3 = 0.75 * V1 + 0.25 * V2 
-
-    vertices = vcat(vertices[1:i1], C1, C2, C3, vertices[i2:end])
     return nothing
 end
 
 
-function remove_bezier_segment!(crv, mousepos)
-    vertices = crv.vertices
-    length(vertices) <= 4 && return nothing #
-    pt_on_curve, i1, i2 = find_closest_point(vertices, mousepos)
+function add_to_middle!(arr::Vector, idx, els)
+    
+    @assert firstindex(arr)<= idx <= lastindex(arr)
+    T = eltype(arr)
+    @assert eltype(els) == T
     
 
-    iclosest = norm(pt_on_curve - vertices[i1])>= norm(pt_on_curve - vertices[i2]) ? i1 : i2
-    if iclosest==firstindex(vertices)
-        deleteat!(vertices, (1,2))
-    elseif iclosest==lastindex(vertices)
-        deleteat!(vertices, (iclosest-1, iclosest))
-    else
-        deleteat!(vertices, [iclosest-1, iclosest, iclosest+1])
+    if idx != lastindex(arr)
+        last = arr[idx:end]
+        deleteat!(arr,idx:length(arr))
+        push!(arr, els...)
+        push!(arr, last...)
+    elseif idx == lastindex
+        push!(arr, els...)
+    elseif idx== firstindex
+        pushfirst!(arr, els...)
     end
+
+    return nothing
+end
+
+function remove_bezier_segment!(vertices, mousepos)
+    
+    length(vertices) <= 4 && return nothing #
+    Q, i1, i2 = find_closest_main_segment_horizontal(vertices, mousepos)
+    @info "mousepos", mousepos, " Q ", Q, "i1", i1, "i2", i2
+    deleteat!(vertices, (i1, i1+1, i2-1))
     return nothing
 end
 
 
-function find_closest_point(vertices, point) 
+function find_closest_main_segment_horizontal(vertices, P)
+
     
-    CP = @view vertices[1:3:end]
-    tclosest = -Inf
-    bestfound = nothing
-    seg = (-1, -1)
-    for i in 2:length(CP)
-        C1, C2 = CP[i-1], CP[i]
-        C3, t = closest_point_to_line_segment(C1, C2, point)
-        if 0<=t<=1
-            return (C3, i-1, i)
-        else
-            if abs(t)<tclosest
-                tclosest, bestfound = abs(t), C3
-                seg = (i-1, i)
+    segments = div(length(vertices)-1, 3)
+    x= P[1]
+    
+    for k in 0:(segments-1)
+        idx = 3k + 1
+        i1, i2 = idx, idx+3
+        
+        V1, V2 = vertices[i1], vertices[i2]
+        x1, x2 = V1[1], V2[1]
+        
+        if k==0
+            if x <= x1
+                Q = 0.5 * V1 + 0.5 *V2
+                
+                return (Q, i1, i2)
             end
         end
-
+        if (k==segments-1)
+            if x >= x2
+                Q = 0.5 * V1 + 0.5 *V2
+                
+                return (Q, i1, i2)
+            end
+        end
+        if x1 < x < x2
+            t = (x - x1)/(x2 - x1)
+            Q = (1-t)*V1 + t * V2
+            
+            return (Q, i1, i2)
+        end
     end
-    return (bestfound, seg...)
+
+end
+
+
+function find_closest_main_segment(vertices, P) 
+    
+    numpts = div(length(vertices)-1, 3)
+    num_segments = numpts-1
+    dmin = Inf
+    Qbest = P
+    idxbest = (1, 4) #default
+    for k in 0:(num_segments - 1)
+        
+        idx = 3 * k + 1
+        i1, i2 = idx, idx+3
+        M1, M2 = vertices[i1], vertices[i2]
+        (Q, d, t) = closest_point_to_line_segment(M1, M2, P)
+        @info "t ", t, "d", d
+        if 0 <= t <= 1
+            return (Q, i1, i2)
+        end
+        
+        if d < dmin
+            dmin = d
+            Qbest = Q
+            idxbest = (i1, i2)
+        end
+    end
+    i1, i2 = idxbest
+    @assert (i2 - i1) == 3
+    return (Qbest, idxbest...)
 end
 
 function closest_point_to_line_segment(L1, L2, P) #closest pt 
     PL1 = P - L1
     L21 = L2 - L1
 
-    nL21 = norm(L21)
-    nPL1 = norm(PL1)
-
-    Q = L1 + dot(PL1, L21) * L21 / (nL21 * nPL1)
-    t = (Q[1] - L2[1]) / (L1[1] - L2[1]) 
-    if isinf(t)
-        t = (Q[2] - L2[2]) / (L1[2] - L2[2])
+    snL21 = dot(L21, L21) #squared norm
+    
+    Q = L1 + dot(PL1, L21) * L21 / snL21 #projected point
+    if L1[1] !==L2[1]
+        t = (L2[1] - Q[1]) / (L21[1])
+    else
+        t = (L2[2] - Q[2] / (L21[2]))
     end
-    return (Q, t)
+    return (Q, norm(P-Q), t)
 end
 
-function move_control_vertices(crv, idx, new_pos)
-    vertices = crv.vertices
+function move_control_vertices!(vertices, idx, new_pos)
+    
     old_pos = vertices[idx]
     vertices[idx] = new_pos #move the vertex to new_pos
 
@@ -286,7 +341,7 @@ function move_control_vertices(crv, idx, new_pos)
     end
 
     #case 2 the moved vertex is a secondary control vertex
-    #rotate around the nearest main vertex the sec. vertex across the main 
+    #rotate the opposite vertex around the nearest main vertex 
     if idx-1 == firstindex(vertices) || idx + 1 == lastindex(vertices) #nothing to do
         return nothing
     end
@@ -301,7 +356,7 @@ function move_control_vertices(crv, idx, new_pos)
         idnext = idx+2
     end
     L = norm(V-center)
-    vertices[idnext] = normalize(center - vertices[idx]) * L 
+    vertices[idnext] = normalize(center - vertices[idx]) * L + center
     return nothing
 end
 
@@ -311,3 +366,6 @@ function is_main_vertex(vertices, idx)
     i = mod(idx, 3) #1 2 0 1 2 0 1 -> 1, 4, 7
     return i==1
 end
+
+
+end #module BezierPath
