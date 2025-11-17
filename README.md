@@ -14,7 +14,7 @@ Type
     main()
 ```
  to start the main GUI:
-![Main GUI][/assets/main_GUI.png]
+![Main GUI](/assets/main_GUI.png)
 
 It's best to maximize the window.
 
@@ -27,7 +27,7 @@ Alternatively you can already add the 'data' argument to main:
 ```
 
 You can drag and drop a file onto the main window and am import subwindow will appear:
-![Import GUI][/assets/import_GUI.png]
+![Import GUI](/assets/import_GUI.png)
 
 After changing the textbox defaults, click on Import! and a plot should appear.
 Red point indicate abnormal points, which you can exclude by clicking on Clean!.
