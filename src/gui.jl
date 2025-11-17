@@ -96,6 +96,10 @@ function main(data = nothing;
                     validator = Int, tellwidth = false,
                     boxcolor = :white)
 
+    btn_manual = Button(fig, label = "Manual")
+    bezier_result_ref = Ref(Dict{String, Any}("status" => -1)) # holds the resampling result for bezier
+
+    
     btn_reset = Button(fig, label = "Reset!")
 
     btn_bspline_plus = Button(fig, label="+")
@@ -108,7 +112,7 @@ function main(data = nothing;
                     Label(fig, "Resample Function", width = nothing),
                     hgrid!(resample_menu, btn_bspline_plus, lab_bspline_control_pts, btn_bspline_minus),
                     hgrid!(Label(fig, "Resample"), tb_resample),
-                    btn_reset,
+                    hgrid!(btn_manual, btn_reset),
     ;
                     tellheight = false, 
                     width = sidebar_sub_width,
@@ -385,6 +389,37 @@ function main(data = nothing;
         update_status_label!(label_status, SSE)
     end
 
+
+    on(btn_manual.clicks) do _
+        #open a new window, do the fitting,
+        #then close the main window and restart with new data
+        # handle_bezier_fit(SSE, screen)
+        @async begin
+            @info "Opening Bezier Fitting Window"
+            bezier_result_ref[]["status"] = 0 #reset the status
+            bezier_result_ref[]["data"] = SSE["rawdata"]
+            BezierPath.bezier_fit_fig(bezier_result_ref) #this should block
+            
+            @info "Closed Bezier Fitting Window"
+            
+            
+            results = bezier_result_ref[] #get the last state
+            # @info "Status", results["status"]
+            bezier_fit = results["bezier fit"]
+            strain = [pt[1] for pt in bezier_fit]
+            stress = [pt[2] for pt in bezier_fit]
+            if !haskey(SSE, "original data")#backup
+                push!(SSE, "original data" => SSE["rawdata"])
+            end
+            SSE["rawdata"] = (;strain, stress)
+            update_SSE!(SSE)
+            update_stress_plot!(axss, SSE; N)
+            update_status_label!(label_status, SSE)
+
+        end
+         
+    end
+
     on(btn_reset.clicks) do _
         reset_SSE!(SSE)
         update_stress_plot!(axss, SSE; N)
@@ -596,7 +631,7 @@ function initialize(data = nothing;
         "Akima",
         "Moving Average",
         "Reg Smooth",
-        "RambergOsgoodAlt"
+        "RambergOsgoodAlt",
     ]
 
     push!(SSE, "interpolant" => fitfuncs[1])
@@ -624,7 +659,7 @@ function update_SSE!(SSE;
             push!(SSE, "original data" => SSE["rawdata"])
         end
         RD = SSE["rawdata"]
-        if SSE["resampler"] != RambergOsgood
+        if SSE["resampler"] != RambergOsgood || SSE["resampler"] 
             resampled_data = resample_curve(RD.strain, RD.stress, SSE["resample density"];
                                     resampler = SSE["resampler"],
                                     d =3,

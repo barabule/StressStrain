@@ -7,51 +7,45 @@ using LinearAlgebra
 
 
 
-function bezier_fit_fig(data = nothing;
-                                results = Dict{String, Any}("bezier fit" => nothing)::Union{Nothing, Dict},#kinda pointless
+function bezier_fit_fig(results::Ref{Dict{String, Any}};
                                 PICK_THRESHOLD = 20,
                                 )
 
      
-    if isnothing(data)  
-        @info "data is nothing"                          
-        # Initial control points (must be a multiple of 3 + 1 for cubic segments, e.g., 4, 7, 10...)
-        initial_cpoints = Point2f[
-            Point2f(0, 0), Point2f(1, 3), Point2f(3, -1), Point2f(5, 0), # First segment
-            Point2f(7, 1), Point2f(8, 2), Point2f(10, 0)                  # Second segment
-        ]
-    else
+    
+    data = results[]["data"]
+    strain = data.strain
+    stress = data.stress
+    min_strain, max_strain = extrema(strain)
+    min_stress, max_stress = extrema(stress)
+    strain = collect(strain)
+    stress = collect(stress) 
+    # push!(results, "scale factors" => (;max_strain, max_stress))
+    P1 = Point2f(0, 0)
+    P4 = Point2f(last(strain), last(stress))
 
-        strain = data.strain
-        stress = data.stress
-        min_strain, max_strain = extrema(strain)
-        min_stress, max_stress = extrema(stress)
-        strain = collect(strain) ./max_strain
-        stress = collect(stress) ./max_stress 
-        push!(results, "scale factors"=> (;max_strain, max_stress))
-        P1 = Point2f(0, 0)
-        P4 = Point2f(last(strain), last(stress))
+    mp = findfirst(x-> x>0.2*max_strain, strain)
+    P2 = Point2f(strain[mp], 1.4 * stress[mp])
+    mp = findfirst(x -> x> 0.8 * max_strain, strain)
+    P3 = Point2f(strain[mp], 1.4 * stress[mp])
 
-        mp = findfirst(x-> x>0.2*max_strain, strain)
-        P2 = Point2f(strain[mp], 1.4 * stress[mp])
-        mp = findfirst(x -> x> 0.8 * max_strain, strain)
-        P3 = Point2f(strain[mp], 1.4 * stress[mp])
-
-        initial_cpoints = Point2f[P1, P2, P3, P4]
-    end
+    initial_cpoints = Point2f[P1, P2, P3, P4]
+    
     
     cpoints = Observable(initial_cpoints) 
     
     
     bezier_curve = lift(cpoints) do pts
         curve = piecewise_cubic_bezier(pts)
-        if !isnothing(results)
-            if haskey(results, "bezier fit")
-                results["bezier fit"] => curve
-            else
-                push!(results, "bezier fit"=> curve)
-            end
+        
+        if haskey(results[], "bezier fit")
+            results[]["bezier fit"] = curve
+            results[]["status"] = 1
+            # @info "updated", results[]["status"]
+        else
+            push!(results[], "bezier fit"=> curve)
         end
+        
         curve
     end
 
@@ -166,6 +160,10 @@ function bezier_fit_fig(data = nothing;
     # Display the figure
     screen = GLMakie.Screen()
     display(screen, fig)
+
+    wait(fig.scene)
+
+    return nothing
 end
 
 function cubic_bezier_point(t::Real, P0, P1, P2, P3)
