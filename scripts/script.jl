@@ -26,9 +26,9 @@ SS = StressStrain
 #                         )
 
 fn = "assets/az41d_sr1e-3s-1.csv"
-data = SS.read_stress_strain_data(fn; delim = ',',
+data = read_stress_strain_data(fn; delim = ',',
                     skipstart = 1,
                     )
 
 
-SS.main(data)
+main(data)

@@ -55,6 +55,15 @@ function bezier_fit_fig(results::Ref{Dict{String, Any}};
                 # aspect = DataAspect(), #maybe not needed
                 )
 
+    label_help = Label(fig, "Press \"a\" to add a segment, \"d\" to delete one.",
+                    fontsize= 16,
+                    color = :grey10,
+                    halign =:center,
+                    valign = :top,
+                    padding = (10, 0, 0, 10),
+                    tellwidth = false,
+                    )
+    fig[0,1] = label_help
     #
     deregister_interaction!(ax, :rectanglezoom)
 
