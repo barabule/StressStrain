@@ -37,10 +37,13 @@ closing the import window.
 The controls are grouped into several categories:
 ## Bottom
 On the bottom is a slider with 2 values: toein and cut off.
-Toein is meant to eliminate the soft portion at the start of the stress strain curve where the slope
+*Toein is meant to eliminate the soft portion at the start of the stress strain curve where the slope
 is too small due to insufficient clamping etc at the start of the measurement.
-Cutoff cut off the last portion of the true stress curve to not  use it for fitting the hardening 
-portion.
+*Cutoff cut off the last portion of the true stress curve to not  use it for fitting the hardening 
+portion. In general a hardening curve for metals should not have non-monotonic rising portions, 
+with this option you can eliminate segments from the hardening portion that would make a worse fit to
+the data.
+
 Both values can be reset non-destructively.
 ## Overview
 Change the material name and check if your data is true stress (checked) or 
@@ -50,10 +53,17 @@ engineering stress (unchecked).
 Here you can resample the true stress function by several methods and also change the number of points.
 It's intended mainly to decimate large datasets (1000s of points) to something easier to handle (~100)
 without loss of precision.
-Usually on sparse  data you don't need to touch any of these.
-A new window will launch if you click on 'Manual'. Here you can manually edit piecewise cubis Bezier curve
-(similar to Inkscape) over your data. Close the window when satisfied with your fit, the data will change 
-according to the new Bezier curve.
+
+Usually on sparse  data you don't need to touch any of these. Don't touch this if you're ok with the
+quality of the data (smoothness etc.).
+### Manual Fit
+A new window will launch if you click on *Manual:
+![Manual Edit](/assets/manual_edit.png)
+Here you can manually edit a piecewise cubic Bezier curve
+(similar to Inkscape) over your data. Close the window when satisfied with your fit, the true stress curve
+will change according to the new Bezier curve. 
+After this you don't need to fit a function anymore to the hardening, because the curve should be already smooth enough.
+
 The reset button will reset the true stress curve back to the original data, the settings will stay the same.
 
 ## E modulus
