@@ -809,7 +809,7 @@ function initialize_axis(fig)
 end
 
 
-
+#TODO may be nicer plot
 function export_data(SSE; 
                     delim = ',',
                     export_true = true,

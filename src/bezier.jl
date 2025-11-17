@@ -6,7 +6,7 @@ using Observables
 using LinearAlgebra
 
 
-
+#TODO highlight the current bezier segment
 function bezier_fit_fig(results::Ref{Dict{String, Any}};
                                 PICK_THRESHOLD = 20,
                                 )
