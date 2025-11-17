@@ -1,5 +1,5 @@
 import Pkg; Pkg.activate("scripts")
-#### ]dev ./../StressStrain ###
+#### ]dev ../../StressStrain ###
 using StressStrain
 SS = StressStrain
 
@@ -31,4 +31,4 @@ data = read_stress_strain_data(fn; delim = ',',
                     )
 
 
-main(data)
+main()

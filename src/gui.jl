@@ -24,7 +24,12 @@ function main(data = nothing;
     end
 
 
-    
+    if isnothing(data)
+        ___strain___ = collect(LinRange(0, 0.1, 100))
+        data = (;strain = ___strain___,
+                stress = @. 100 * ___strain___ ^ 0.16 + rand() * 2
+                )
+    end
 
 
     fig = Figure(title = "Elasto Plastic Fitter")
