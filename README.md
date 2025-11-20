@@ -2,9 +2,17 @@
 Simple stress-strain and hardening curve fitting in Julia. Mainly intended for metals/ elasto-plastic materials.
 
 # Installation
-```
-    git clone ...
 
+Make a new empty folder and open Julia into it (or navigate via cd("path/to/folder") in Julia).
+Then open the package promp with ']' and type:
+```
+    activate .
+    add https://github.com/barabule/StressStrain.git
+
+```
+After installation finishes, exit package mode (with Backspace) and type:
+```
+    using StressStrain
 ```
 
 # Usage
