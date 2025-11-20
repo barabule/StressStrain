@@ -403,7 +403,7 @@ function main(data = nothing;
             @info "Opening Bezier Fitting Window"
             bezier_result_ref[]["status"] = 0 #reset the status
             bezier_result_ref[]["data"] = SSE["rawdata"]
-            BezierPath.bezier_fit_fig(bezier_result_ref) #this should block
+            CubicPiecewiseBezier.bezier_fit_fig(bezier_result_ref)
             
             @info "Closed Bezier Fitting Window"
             
@@ -411,12 +411,13 @@ function main(data = nothing;
             results = bezier_result_ref[] #get the last state
             # @info "Status", results["status"]
             bezier_fit = results["bezier fit"]
-            strain = [pt[1] for pt in bezier_fit]
-            stress = [pt[2] for pt in bezier_fit]
+            #no longer necessary, this returns directly what we need
+            # strain = [pt[1] for pt in bezier_fit]
+            # stress = [pt[2] for pt in bezier_fit]
             if !haskey(SSE, "original data")#backup
                 push!(SSE, "original data" => SSE["rawdata"])
             end
-            SSE["rawdata"] = (;strain, stress)
+            SSE["rawdata"] = bezier_fit
             update_SSE!(SSE)
             update_stress_plot!(axss, SSE; N)
             update_status_label!(label_status, SSE)

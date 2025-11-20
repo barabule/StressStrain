@@ -1,4 +1,4 @@
-module BezierPath
+module CubicPiecewiseBezier
 
 using GLMakie
 import GLMakie.GLFW
@@ -18,9 +18,9 @@ function bezier_fit_fig(results::Ref{Dict{String, Any}};
     stress = data.stress
     min_strain, max_strain = extrema(strain)
     min_stress, max_stress = extrema(stress)
-    strain = collect(strain)
-    stress = collect(stress) 
-    # push!(results, "scale factors" => (;max_strain, max_stress))
+    strain = collect(strain) .* 1/max_strain
+    stress = collect(stress) .* 1/max_stress
+    push!(results[], "scale factors" => (;max_strain, max_stress))
     P1 = Point2f(0, 0)
     P4 = Point2f(last(strain), last(stress))
 
@@ -39,11 +39,12 @@ function bezier_fit_fig(results::Ref{Dict{String, Any}};
         curve = piecewise_cubic_bezier(pts)
         
         if haskey(results[], "bezier fit")
-            results[]["bezier fit"] = curve
+            results[]["bezier fit"] = rescale_back(curve, results[]["scale factors"])
             results[]["status"] = 1
             # @info "updated", results[]["status"]
         else
-            push!(results[], "bezier fit"=> curve)
+            push!(results[], 
+                "bezier fit"=> rescale_back(curve, results[]["scale factors"]))
         end
         
         curve
@@ -409,4 +410,11 @@ function is_main_vertex(vertices, idx)
 end
 
 
-end #module BezierPath
+function rescale_back(curve, scale_factors)
+    s1, s2 = scale_factors
+    return (;strain = [c[1] * s1 for c in curve],
+             stress = [c[2] * s2 for c in curve])
+end
+
+
+end #module CubicPiecewiseBezier

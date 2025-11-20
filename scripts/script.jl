@@ -31,4 +31,4 @@ data = read_stress_strain_data(fn; delim = ',',
                     )
 
 
-main()
+main(data)
