@@ -22,7 +22,8 @@ Type
     main()
 ```
  to start the main GUI:
-![Main GUI](/assets/main_GUI.png | width = 400px)
+
+<img src = "/assets/main_GUI.png" width = "400" align = "Center">
 
 It's best to maximize the window.
 
@@ -35,7 +36,8 @@ Alternatively you can already add the 'data' argument to main:
 ```
 
 You can drag and drop a file onto the main window and am import subwindow will appear:
-![Import GUI](/assets/import_GUI.png | width = 400px)
+
+<img src = "/assets/import_GUI.png" width = "300" align = "Center">
 
 After changing the textbox defaults, click on Import! and a plot should appear.
 Red point indicate abnormal points, which you can exclude by clicking on Clean!.
@@ -66,7 +68,9 @@ Usually on sparse  data you don't need to touch any of these. Don't touch this i
 quality of the data (smoothness etc.).
 ### Manual Fit
 A new window will launch if you click on *Manual:
-![Manual Edit](/assets/manual_edit.png | width = 400px)
+
+<img src = "/assets/manual_edit.png" width = "400" align = "Center">
+
 Here you can manually edit a piecewise cubic Bezier curve
 (similar to Inkscape) over your data. Close the window when satisfied with your fit, the true stress curve
 will change according to the new Bezier curve. 
