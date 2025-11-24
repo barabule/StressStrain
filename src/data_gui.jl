@@ -7,174 +7,133 @@ function data_gui(parent_screen::GLMakie.Screen , fn::AbstractString, defaults =
                 )
 
 
+    DF = nothing
+    try 
+        DF = CSV.read(fn, DataFrame)
+        size(DF,2)>= 2 || return nothing #not enough columns found...
+        
+    catch e
+        return nothing 
+    end
+
+    initial_data = (;strain = DF[:,1], 
+                            stress = DF[:,2])
+
+    #global data store
+    Imported = Dict{Symbol, Any}( :DataFrame => DF,
+                                :extracted => initial_data,
+                                :abnormal_indices => find_abnormal_points(initial_data; tooclose),
+                                :num_cols => size(DF, 2),
+                                :strain_col => 1,
+                                :stress_col => 2,
+                                :strain_mult => 1.0,
+                                :stress_mult => 1.0,
+                                )
+    
+
+    #######################LAYOUT#######################################################################################
+    
     fig = Figure()
 
     ax_plot = Axis(fig[1,1])
 
-    preread_file(ax_plot, fn, readahead)
-
-    controls = GridLayout(fig[1,2], tellheight = false, width = sidebar_width)
-
-    delim_list = zip(
-                    (",", "TAB", "SPACE", ";",),
-                    (',', '\t', ' ', ';')
-                    )
+    control_gl = GridLayout(fig[1,2], tellheight = false, width = sidebar_width)
 
 
-    menu_delim = Menu(fig, options = delim_list, default = ",")
+    screen = GLMakie.Screen(;title = "Import Data")
+
+    #######################PLOT######################################################################
     
-
-    tb_skip = Textbox(fig, 
-                    validator = Int, 
-                    stored_string = isnothing(defaults) ? "0" : string(defaults[:skipstart]),
-                    )
-
-
-    tb_strain_col = Textbox(fig,
-                        validator = Int, 
-                        stored_string = isnothing(defaults) ? "1" : string(defaults[:strain_col]),
-                        )
-
-    tb_stress_col = Textbox(fig, 
-                        validator = Int,
-                        stored_string = isnothing(defaults) ? "2" : string(defaults[:stress_col]),
-    )
+    update_data_plot!(ax_plot, 
+                    Imported[:extracted], 
+                    Imported[:abnormal_indices])
+    
+    ####################################################################################################################
+    
+    slider_strain_col = Slider(fig, range = 1:Imported[:num_cols], startvalue = 1)
+    slider_stress_col = Slider(fig, range = 1:Imported[:num_cols], startvalue = 2)
 
     tb_strain_mult = Textbox(fig, 
-                        validator = Int,
-                        stored_string = isnothing(defaults) ? "1.0" : string(defaults[:strain_mult]),
+                        validator = Float64,
+                        placeholder = "$(Imported[:strain_mult])",
     )
 
     tb_stress_mult = Textbox(fig, 
-                        validator = Int,
-                        stored_string = isnothing(defaults) ? "1.0" : string(defaults[:stress_mult]),
-    )
+                        validator = Float64,
+                        placeholder = "$(Imported[:stress_mult])",
+                        )
 
 
-    btn_import = Button(fig, label = "Import")
+    
     btn_done   = Button(fig, label = "Done!")
     btn_clean = Button(fig, label = "Clean!")
 
-    controls[1,1] = vgrid!(
-            hgrid!(Label(fig, "Delimiter"), menu_delim),
-            hgrid!(Label(fig, "Skip rows:"), tb_skip),
-            hgrid!(Label(fig, "Strain column:"), tb_strain_col),
-            hgrid!(Label(fig, "Stress column:"), tb_stress_col),
+    control_gl[1,1] = vgrid!(
+            hgrid!(Label(fig, "Strain column:"), slider_strain_col),
+            hgrid!(Label(fig, "Stress column:"), slider_stress_col),
             hgrid!(Label(fig, "Strain multiplier:"), tb_strain_mult),
             hgrid!(Label(fig, "Stress multiplier"), tb_stress_mult),
-            hgrid!(btn_import, btn_clean),
-            btn_done,
+            hgrid!(btn_clean, btn_done),
     )
-
-
-    ################defaults###########################################################
-    if isnothing(defaults)
-        delim = Observable(',')
-        skipstart = Observable(0)
-        strain_col = Observable(1)
-        stress_col = Observable(2)
-
-        strain_mult = Observable(1.0)
-        stress_mult = Observable(1.0)
-    else
-        delim = defaults[:delim]
-        skipstart = defaults[:skipstart]
-        strain_col = defaults[:strain_col]
-        stress_col = defaults[:stress_col]
-
-        strain_mult = defaults[:strain_mult]
-        stress_mult = defaults[:stress_mult]
-    end
-    data = Observable(nothing::Union{Nothing, NamedTuple})
-
-    abnormal_indices = Observable{Vector{Int}}
 
     ###############EVENTS##############################################################
 
-    
-    on(tb_skip.stored_string) do s
-            skipstart = clamp(parse(Int, s), 0, typemax(Int))
-        end
-
-    for (tb, obs) in zip(
-                        (tb_strain_col, tb_stress_col),
-                        (strain_col, stress_col)
-                        )
-        on(tb.stored_string) do s
-            #strain and stresscol must be different
-            vs = clamp(parse(Int, s), 1, typemax(Int))
-            obs = vs
-            if obs==strain_col
-                stress_col = vs + 1
-            elseif obs == stress_col
-                strain_col = vs + 1
+    for (i, sld) in enumerate((slider_strain_col, slider_stress_col))
+        
+        other_slider = i==1 ? slider_stress_col : slider_strain_col
+        on(sld.value) do val
+            idx_not = filter(i -> i != val, 1:Imported[:num_cols]) #the available col ids
+            if other_slider.value[] == val
+                set_close_to!(other_slider, first(idx_not))
             end
-
+            strain_col = i==1 ? val : other_slider.value[]
+            stress_col = i==1 ? other_slider.value[] : val
+            update_Imported!(Imported; strain_col, stress_col)
+            update_data_plot!(ax_plot, Imported[:extracted], Imported[:abnormal_indices])
         end
     end
     
+    for (i, tb) in enumerate((tb_strain_mult, tb_stress_mult))
 
-    for (tb, obs) in zip(
-                (tb_strain_mult, tb_stress_mult),
-                (strain_mult, stress_mult))
+        
         on(tb.stored_string) do s
-            obs = parse(Float64, s)
-        end
-    end
-
-
-    on(menu_delim.selection) do s
-        delim = s
-    end
-
-    on(btn_import.clicks) do _
-        try
-            @info "delim", delim[]
-            data = read_stress_strain_data(fn;
-                        delim = delim[], 
-                        skipstart = skipstart[],
-                        strain_col = strain_col[],
-                        stress_col = stress_col[],
-                        strain_multiplier = strain_mult[],
-                        stress_multiplier =stress_mult[],
-                        )
-            abnormal_indices = find_abnormal_points(data; tooclose)
-        catch
-            println("Could not import!")
-        end
-
-        if !isnothing(data)
-            update_data_plot!(ax_plot, data, abnormal_indices)
-        else
-            println("Could not import!")
+            val = parse(Float64, s)
+            val == 0 && return nothing
+            if i==1
+                update_Imported!(Imported; strain_mult = val, tooclose)
+            else
+                update_Imported!(Imported; stress_mult = val, tooclose)
+            end
+            update_data_plot!(ax_plot, Imported[:extracted], Imported[:abnormal_indices])
         end
 
     end
-   
+
+
     on(btn_clean.clicks) do _
+        data = Imported[:extracted]
         if !isnothing(data)
-            clean!(data, abnormal_indices)
-            empty!(abnormal_indices)
-            update_data_plot!(ax_plot, data, abnormal_indices)
+            
+            idx = Imported[:abnormal_indices]
+            clean!(data, idx)
+            Imported[:abnormal_indices] = idx
+            Imported[:extracted] = data
+            update_data_plot!(ax_plot, Imported[:extracted], Imported[:abnormal_indices])
         end
 
     end
 
     on(btn_done.clicks) do _
+        data = Imported[:extracted]
         if !isnothing(data) 
             
              #close the figure
             close(screen)
             #probably the cleanest
             close(parent_screen)
-            defaults[:delim] = delim[]
-            defaults[:skipstart] = skipstart[]
-            defaults[:strain_col] = strain_col[]
-            defaults[:stress_col] = stress_col[]
-            defaults[:strain_mult] = strain_mult[]
-            defaults[:stress_mult] = stress_mult[]
+            
 
-            main(data;
+            main(Imported[:extracted];
                 clean_data = false,
                 import_defaults = defaults)
             
@@ -182,7 +141,7 @@ function data_gui(parent_screen::GLMakie.Screen , fn::AbstractString, defaults =
 
     end
 
-    screen = GLMakie.Screen()
+    
     
     display(screen, fig)
 end
@@ -197,7 +156,6 @@ function update_data_plot!(ax, data, abnormal = nothing)
     #delete the legend
     for (i, block) in enumerate(fig.content)
         if block isa Makie.Legend
-            # 3. If found, delete it using the delete! function
             Makie.delete!(block)
         end
     end
@@ -209,14 +167,14 @@ function update_data_plot!(ax, data, abnormal = nothing)
                         label = "Abnormal Points",
                         color = :red, 
                         marker= 'X',
-                        markersize = 8)
+                        markersize = 12)
     end
 
     axislegend(ax, position = :rb)
     return nothing
 end
 
-function clean!(data, abnormal_indices = nothing; maxiter = 10)
+function clean!(data, abnormal_indices=nothing; maxiter = 10)
     if isnothing(abnormal_indices)
         abnormal_indices = find_abnormal_points(data)
     end
@@ -233,19 +191,33 @@ function clean!(data, abnormal_indices = nothing; maxiter = 10)
 
 end
 
+function update_Imported!(Imported; 
+                        strain_col = nothing,
+                        stress_col = nothing,
+                        strain_mult = nothing,
+                        stress_mult = nothing,
+                        tooclose = 1e-6,
+                    )
+@assert hasallkeys(Imported, (:DataFrame, :extracted, :strain_col, :stress_col, :strain_mult, :stress_mult, :abnormal_indices))
+@assert hasallkeys(Imported[:extracted], (:strain, :stress))
 
-function preread_file(ax, fn, numlines)
+strain_col = isnothing(strain_col) ? Imported[:strain_col] : strain_col
+stress_col = isnothing(stress_col) ? Imported[:stress_col] : stress_col
+strain_mult = isnothing(strain_mult) ? Imported[:strain_mult] : strain_mult
+stress_mult = isnothing(stress_mult) ? Imported[:stress_mult] : stress_mult
 
-    
-    nl = 0
+data = Imported[:extracted]
+strain = Imported[:DataFrame][:, strain_col] .* strain_mult
+stress = Imported[:DataFrame][:, stress_col] .* stress_mult
+Imported[:extracted] = (;strain, stress)
+Imported[:abnormal_indices] = find_abnormal_points(data;tooclose)
 
-    for line in eachline(fn)
-        nl+=1
-        nl > numlines && break
+return nothing
+end
 
-        text!(ax, 0.0, (numlines-nl+1)*10; text = line)
-        
+function hasallkeys(container, keys)
+    for key in keys
+        !haskey(container, key) && return false 
     end
-    
-    return nothing
+    return true
 end
