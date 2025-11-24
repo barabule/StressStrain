@@ -7,3 +7,6 @@ RegularizationTools = "29dad682-9a27-4bc3-9c72-016788665182"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 StressStrain = "35c0c9d5-9623-45a6-a87f-5a655e412bc9"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[sources]
+StressStrain = {path = ".."}
