@@ -1,6 +1,7 @@
 
 
-function data_gui(parent_screen::GLMakie.Screen , fn::AbstractString, defaults = nothing::Union{Nothing, Dict};
+function data_gui(parent_screen::GLMakie.Screen , #GLFW screen to be able to close the parent
+                fn::AbstractString;
                 sidebar_width = 300,
                 tooclose = 1e-6, #tolerance for too close strain points
                 readahead = 10, #how many lines to read before import
@@ -135,7 +136,7 @@ function data_gui(parent_screen::GLMakie.Screen , fn::AbstractString, defaults =
 
             main(Imported[:extracted];
                 clean_data = false,
-                import_defaults = defaults)
+                )
             
         end
 
