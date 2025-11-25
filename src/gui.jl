@@ -80,46 +80,39 @@ function main(data = nothing;
     
     sidebar = GridLayout(fig[1,2], width = sidebar_width, tellheight = false) #holds most controls
 
-    overview_gl = GridLayout(sidebar[1,1])
-    true_stress_gl = GridLayout(sidebar[2,1])
-    emod_gl = GridLayout(sidebar[3,1])
-    hardening_gl = GridLayout(sidebar[4,1])
-    
-
-
-    #Gl to hold the controls
-    
-    true_stress_gl_sub = GridLayout(true_stress_gl[1,1], width = sidebar_sub_width, alignmode = Outside(10))
-    emod_gl_sub        = GridLayout(emod_gl[1,1], width = sidebar_sub_width, alignmode = Outside(10))
-    hardening_gl_sub   = GridLayout(hardening_gl[1,1], width = sidebar_sub_width, alignmode = Outside(10))
-    
-
-
     gl_bot = GridLayout(fig[2, 1], height = bottom_panel_height, tellwidth = false)
     gl_bot_sub = GridLayout(gl_bot[1,1], alignmode = Outside(20), height = bottom_panel_sub_height)
 
 
-    # export_gl = GridLayout(fig[2,2])
-    export_gl = GridLayout(sidebar[5,1])
-    export_gl_sub = GridLayout(export_gl[1, 1], 
-                        width = sidebar_sub_width,
-                        # tellheight = false, tellwidth = false, 
-                        alignmode = Outside(10))
+    ################# SIDEBAR BLOCKS #############################################################################
 
-    ################# BLOCKS ###########################################################################################
-
-    for (gl_block, draw_controls!, btn_label) in (
-                                    (overview_gl, draw_overview_controls!, "Overview"),
-                                    (true_stress_gl, draw_true_stress_controls!, "True Stress"),
-                                    (emod_gl, draw_emodulus_controls!, "E modulus"),
-                                    (hardening_gl, draw_hardening_controls!, "Hardening"),
-                                    (export_gl, draw_export_controls!, "Export"),
+    for (i, entry) in enumerate(
+                                    (   
+                                    (draw_overview_controls!, "Overview"),
+                                    (draw_true_stress_controls!, "True Stress"),
+                                    (draw_emodulus_controls!, "E modulus"),
+                                    (draw_hardening_controls!, "Hardening"),
+                                    (draw_export_controls!, "Export"),
                                     )
+                                )
+
+        draw_controls!, btn_label = entry
+        gl_block = GridLayout(sidebar[i, 1])
+
         controls = GridLayout()
         draw_controls!(fig, controls, CURVEDATA)
         make_button_block!(gl_block, controls;
                             btn_label,
                             btn_width = CURVEDATA[:sidebar_sub_width]/3)
+                            
+        Box(gl_block[:, :], linestyle = :solid,
+            color = :grey90,
+            width = CURVEDATA[:sidebar_width],
+            tellwidth = true,
+            tellheight = false,
+            alignmode = Outside(-5),
+            cornerradius = 10,
+            z = -100)
 
     end
 
@@ -141,42 +134,14 @@ function main(data = nothing;
 
     label_status = Label(gl_bot_sub[2,:], "Status", tellwidth = false)
 
-    
+    Box(gl_bot[1,1], 
+            linestyle = :solid,
+            height = bottom_panel_height,
+            color = :grey90,
+            tellwidth = false,
+            z = -100)
 
-    ############## BOXES ###############################################################################################
-    # for sidebar in (overview_gl_sub, true_stress_gl_sub, emod_gl_sub, hardening_gl_sub, export_gl_sub)
-    #     Box(sidebar[2,:], 
-    #         linestyle = :solid,
-    #         color = :grey90,
-    #         width = sidebar_width,
-    #         tellwidth = true,
-    #         tellheight = false,
-    #         alignmode = Outside(-10),
-    #         cornerradius = 10,
-    #         z = -100)
-
-    # end
-    # Box(gl_bot[1,1], 
-    #         linestyle = :solid,
-    #         height = bottom_panel_height,
-    #         color = :grey90,
-    #         tellwidth = false,
-    #         z = -100)
-
-
-    # Box(export_gl[:, :],
-    #             linestyle = :solid,
-    #             color = :grey90,
-    #             z = -100)
-        
-    ####################EVENTS########################################################################        
-   
-    
-
-
-
-    
-
+    ################# EVENTS ###########################################################################################
     
     on(events(fig).dropped_files) do files
         isempty(files) && return nothing
@@ -188,20 +153,6 @@ function main(data = nothing;
         update_stress_plot!(axss, SSE)
     end
 
-    
-
-    # on(tb_name.stored_string) do s
-    #     SSE["name"] = s
-    #     update_stress_plot!(axss, SSE)
-    # end
-
-    
-
-
-    
-
-
-    
 
     on(sld_int.interval) do intv
         lo, hi = intv
