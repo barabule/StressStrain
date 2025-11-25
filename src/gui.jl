@@ -42,6 +42,7 @@ function main(data = nothing;
             # gui
             :sidebar_width => sidebar_width,
             :sidebar_sub_width => sidebar_sub_width,
+            :status_label => nothing, #here goes the status label handle
             # resampling 
             :resample_menu_options => zip(resamplefunclabels, resamplefuncs),
             :menu_hardening_fit_options => zip(fitfunclabels, fitfuncs),
@@ -168,6 +169,7 @@ function main(data = nothing;
     Label(gl_bot_sub[1,3],  @lift $labeltext_sld_int[2])
 
     label_status = Label(gl_bot_sub[2,:], "Status", tellwidth = false)
+    CURVEDATA[:status_label] = label_status
 
     Box(gl_bot[1,1], 
             linestyle = :solid,
@@ -198,7 +200,7 @@ function main(data = nothing;
         
         update_modulus_slider!(sld_modulus, CURVEDATA)
         update_stress_plot!(CURVEDATA)
-        update_status_label!(label_status, CURVEDATA)
+        update_status_label!(CURVEDATA)
     end
 
 
@@ -404,9 +406,11 @@ function recompute_data!(D::Dict{Symbol, Any})
     D[:true_stress] = cutoff(TS, D[:cutoff])
 
     #5. compute E modulus
-    if D[:recompute_modulus]
-        D[:e_modulus] = get_modulus(D[:true_stress];
-                                    max_strain = D[:max_elastic_range])
+    if D[:recompute_modulus] 
+        
+        D[:e_modulus] = D[:is_fixed_modulus] ? D[:e_modulus] : 
+                            get_modulus(D[:true_stress];
+                                        max_strain = D[:max_elastic_range])
     end
     
     #6. RambergOsgood 
@@ -488,7 +492,8 @@ function update_modulus_slider!(sld, D::Dict{Symbol, Any})
 end
 
 
-function update_status_label!(label, D::Dict{Symbol, Any})
+function update_status_label!(D::Dict{Symbol, Any})
+    label = D[:status_label]
     text = interpolant_label(D[:hardening_fitter], D[:hardening_interpolant])
     # println(text)
     E = "E = $(D[:e_modulus]) MPa, "
@@ -505,26 +510,20 @@ end
 
 
 #TODO may be nicer plot
-function export_data(SSE; 
-                    delim = ',',
-                    export_true = true,
-                    export_hardening = true,
-                    export_plot = true,
-                    plot_export_format = :png,
-                    px_per_unit = 2, #output size scaling
-                    )
+function export_data(D::Dict{Symbol, Any})
 
-    true_stress = SSE["true stress"]
-    
-    hardening_func = SSE["hardening fit"]
-    tmax = SSE["export max strain"]
-    tout = collect(LinRange(0, tmax, SSE["export density"]))
+    true_stress = D[:true_stress]
+    delim = D[:export_format_delim]
+
+    hardening_func = D[:hardening_fitter]
+    tmax = D[:max_plastic_strain]
+    tout = collect(LinRange(0, tmax, D[:export_density]))
     sout = hardening_func(tout)
 
-    output_folder =  isnothing(SSE["export folder"]) ? pwd() : SSE["export folder"]
+    output_folder =  isnothing(D[:export_folder]) ? pwd() : D[:export_folder]
 
-    fname = SSE["name"]
-    if export_hardening
+    fname = D[:name]
+    if D[:export_hardening]
         fname1 = joinpath(output_folder, fname * "_hardening.csv")
         writedlm(fname1,
                     [tout sout], 
@@ -532,7 +531,7 @@ function export_data(SSE;
                     )
     end
 
-    if export_true
+    if D[:export_true_stress]
         fname2 = joinpath(output_folder, fname * "_true stress.csv")             
         writedlm(fname2,
                     [true_stress.strain true_stress.stress],
@@ -540,18 +539,23 @@ function export_data(SSE;
                     )
     end
 
-    if export_plot
-        # fext = plot_export_format==:png ? ".png" : ".svg" #doesn't work in GLMakie...
+    if D[:export_plot]
         fext = ".png"
         fname3 = joinpath(output_folder, fname * "_plot" * fext)
         
         fig = Figure(size = (1200,800))
         ax = initialize_axis(fig)
-        update_stress_plot!(ax, SSE; N = SSE["export density"])
+        old_ax = D[:axis]
+        D[:axis] = ax
+        update_stress_plot(D)
+        D[:axis] = old_ax
 
         label_status = Label(fig[2,1],tellwidth = false)
-        update_status_label!(label_status, SSE)
-        
+        old_st_label = D[:status_label]
+        D[:status_label] = label_status
+        update_status_label!(D)
+        D[:status_label] = old_st_label
+
         screen = GLMakie.Screen()
         display(screen, fig)
         save(fname3, fig; px_per_unit)
@@ -562,10 +566,7 @@ function export_data(SSE;
     @info  "Done"
 end
 
-function export_data(D::Dict{Symbol, Any})
 
-
-end
 
 function draw_overview_controls!(fig::Figure, Lay::GridLayout, D::Dict{Symbol, Any})
     @assert hasallkeys(D, [:is_true_stress, :name, :sidebar_sub_width])
@@ -587,14 +588,14 @@ function draw_overview_controls!(fig::Figure, Lay::GridLayout, D::Dict{Symbol, A
 
     on(cb_true_stress.checked) do val
         D[:is_true_stress] = val
-        #recalc
-        #update plot
-        #update status
+        recompute_data!(D)
+        update_stress_plot(D)
+        update_status_label!(D)
     end
 
     on(tb_name.stored_string) do s
         D[:name] = s
-        #update plot title
+        update_stress_plot(D)
     end
 
     ####################################################################################################################
@@ -641,11 +642,12 @@ function draw_true_stress_controls!(fig::Figure, Lay::GridLayout, D::Dict{Symbol
     ###### BEHAVIOR #######
     on(resample_menu.selection) do s
         # #TODO better handling of modulus update when fitting on true stress
-        # SSE["resampler"] = s
-        # # @info "SSE", SSE["resampler"]
-        # update_SSE!(SSE;resample = true, recompute_modulus = false)
-        # update_stress_plot!(axss, SSE; N)
-        # update_status_label!(label_status, SSE)
+        D[:resampler] = s
+         D[:recompute_modulus] = false
+        recompute_data!(D)
+        D[:recompute_modulus] = true
+        update_stress_plot(D)
+        update_status_label!(D)
     end
     on(btn_bspline_plus.clicks) do _
         # nc = SSE["BSpline approximation knots"]
@@ -668,46 +670,47 @@ function draw_true_stress_controls!(fig::Figure, Lay::GridLayout, D::Dict{Symbol
     end
 
     on(tb_resample.stored_string) do s
-        # SSE["resample density"] = clamp(parse(Int, s), 2, 10_000)
-        # update_SSE!(SSE;alg, resample = true, recompute_modulus = false)
-        # update_stress_plot!(axss, SSE; N)
-        # update_status_label!(label_status, SSE)
+        
+        D[:resample_density] = clamp(parse(Int,s), 2, 10_000)
+        D[:resample_base_data] = true
+        D[:recompute_modulus] = false
+        recompute_data!(D)
+        D[:resample_base_data] = false
+        D[:recompute_modulus] = true
+        
+        update_stress_plot(D)
+        update_status_label!(D)
     end
 
     on(btn_manual.clicks) do _
         # #open a new window, do the fitting,
         # #then close the main window and restart with new data
-        # # handle_bezier_fit(SSE, screen)
-        # @async begin
-        #     @info "Opening Bezier Fitting Window"
-        #     bezier_result_ref[]["status"] = 0 #reset the status
-        #     bezier_result_ref[]["data"] = SSE["rawdata"]
-        #     CubicPiecewiseBezier.bezier_fit_fig(bezier_result_ref)
+        # handle_bezier_fit(SSE, screen)
+        @async begin
+            @info "Opening Bezier Fitting Window"
+            bezier_result_ref[]["status"] = 0 #reset the status
+            bezier_result_ref[]["data"] = D[:base_data]
+            CubicPiecewiseBezier.bezier_fit_fig(bezier_result_ref)
             
-        #     @info "Closed Bezier Fitting Window"
+            @info "Closed Bezier Fitting Window"
             
             
-        #     results = bezier_result_ref[] #get the last state
-        #     # @info "Status", results["status"]
-        #     bezier_fit = results["bezier fit"]
-        #     #no longer necessary, this returns directly what we need
-        #     # strain = [pt[1] for pt in bezier_fit]
-        #     # stress = [pt[2] for pt in bezier_fit]
-        #     if !haskey(SSE, "original data")#backup
-        #         push!(SSE, "original data" => SSE["rawdata"])
-        #     end
-        #     SSE["rawdata"] = bezier_fit
-        #     update_SSE!(SSE)
-        #     update_stress_plot!(axss, SSE; N)
-        #     update_status_label!(label_status, SSE)
+            results = bezier_result_ref[] #get the last state
+            # @info "Status", results["status"]
+            bezier_fit = results["bezier fit"]
+            D[:base_data] = bezier_fit
+            recompute_data!(D)
+            update_stress_plot(D)
+            update_status_label!(D)
 
-        # end
+        end
          
     end
 
     on(btn_reset.clicks) do _
-        # reset_SSE!(SSE)
-        # update_stress_plot!(axss, SSE; N)
+        D[:base_data] = deepcopy(D[:rawdata])
+        recompute_data!(D)
+        update_stress_plot(D)
     end
 
     return nothing
@@ -774,38 +777,43 @@ function draw_emodulus_controls!(fig::Figure, Lay::GridLayout, D::Dict{Symbol, A
 
 #########BEHAVIOR ####################################################################
     on(sld_modulus.value) do val
-        # update_SSE!(SSE; modulus = round(val; sigdigits =3), alg)
+        
         D[:e_modulus] = round(val; sigdigits =3)
         D[:recompute_modulus] = false
         recompute_data!(D)
         D[:recompute_modulus] = true
-        # update_stress_plot!(axss, SSE; N)
+        
         update_stress_plot(D)
         tb_modulus.displayed_string = "$(round(sld_modulus.value[]; sigdigits= 3))"
-        update_status_label!(label_status, D)
+        update_status_label!(D)
     end
 
     on(sld_elastic_range.value) do val
-        # SSE["elastic range"] = val
-        # lab_elastic_range_val.text = string(round(val;sigdigits = 4))
-        # update_SSE!(SSE)
-        # update_stress_plot!(axss, SSE; N)
-        # update_status_label!(label_status, SSE)
+        
+        D[:max_elastic_range] = val
+        lab_elastic_range_val.text = string(round(val;sigdigits = 4))
+        recompute_data!(D)
+        update_stress_plot(D)
+        update_status_label!(D)
     end
 
     on(tb_modulus.stored_string) do s
         #update modulus only in the checkbox is unchecked
-        # if !cb_fixed.checked[]
-        #     modulus = round(parse(Float64, s); sigdigits = 3)
-        #     update_SSE!(SSE; modulus)
-        #     update_stress_plot!(axss, SSE;N)
-        #     update_status_label!(label_status, SSE)
-        # end
+        if !cb_fixed.checked[]
+            modulus = round(parse(Float64, s); sigdigits = 3)
+            # update_SSE!(SSE; modulus)
+            D[:e_modulus] = modulus
+            D[:recompute_modulus] = false
+            recompute_data!(D)
+            D[:recompute_modulus] = true
+            update_stress_plot(D)
+            update_status_label!(D)
+        end
     end
 
     
     on(cb_fixed.checked) do val
-        # SSE["fixed modulus"] = val
+        D[:is_fixed_modulus] = val
     end
 
     on(sld_offset.value) do val
@@ -844,11 +852,9 @@ function draw_hardening_controls!(fig::Figure, Lay::GridLayout, D::Dict{Symbol, 
     
 
     Lay[1, 1] = vgrid!(
-            # Label(fig, "Hardening Curve", fontsize = 20, font =:italic),
             hgrid!(Label(fig, "Method"), fit_menu),
             hgrid!(Label(fig, "Num Pts"), tb_hardening_pts),
             hgrid!(Label(fig, "Extrapolate strain to"), tb_extrapolation_strain),
-            # (Label("True", alignmode = :right), Checkbox(checked = false)),
             ;
             halign = :left,
             tellheight = false, 
@@ -857,25 +863,36 @@ function draw_hardening_controls!(fig::Figure, Lay::GridLayout, D::Dict{Symbol, 
     ########### BEHAVIOR #############
     on(fit_menu.selection) do s
         
-        # SSE["interpolant"] = s
-        # update_SSE!(SSE; alg, recompute_modulus = false) #don't recalc modulus
-        # update_status_label!(label_status, SSE)
-        # update_stress_plot!(axss, SSE; N)
+        
+        D[:hardening_interpolant] = s
+         #only need to recalculated the interpolation fit
+        D[:recompute_modulus] = false
+        D[:recompute_true_stress] = false
+        D[:recompute_hardening_portion] = false
+        recompute_data!(D)
+        D[:recompute_modulus] = true
+        D[:recompute_true_stress] = true
+        D[:recompute_hardening_portion] = true
+        update_stress_plot(D)
+        update_status_label!(D)
     end
 
     on(tb_extrapolation_strain.stored_string) do s
         
         # SSE["export max strain"] = clamp(parse(Float64, s), last(SSE["hardening"].strain), Inf)
+        D[:max_plastic_strain] = clamp(parse(Float64, s), last(D[:hardening_portion].strain), Inf)
         # update_stress_plot!(axss, SSE; N)
-        # update_status_label!(label_status, SSE)
-        # update_status_label!(label_status, SSE)
+        update_stress_plot(D)
+        update_status_label!(D)
+        
     end
 
     on(tb_hardening_pts.stored_string) do s
-        # num_hardening_pts = Int(clamp(parse(Int, s), 2, Inf))
+        num_hardening_pts = Int(clamp(parse(Int, s), 2, Inf))
         # SSE["export density"] = num_hardening_pts
-        # update_SSE!(SSE;alg)
-        # update_stress_plot!(axss, SSE; N = num_hardening_pts)
+        D[:export_density] = num_hardening_pts
+        recompute_data!(D)
+        update_stress_plot(D)
     end
 
 
@@ -902,11 +919,10 @@ function draw_export_controls!(fig::Figure, Lay::GridLayout, D::Dict{Symbol, Any
     ########## BEHAVIOR #################
 
     on(btn_export.clicks) do _
-        # export_data(SSE; export_true = cb_exp_true.checked[],
-        #                 export_hardening = cb_exp_hardening.checked[],
-        #                 export_plot = cb_exp_plot.checked[],
-        #                 # plot_export_format = menu_export_format.selection,
-        #                 )
+        D[:export_true_stress] = cb_exp_true.checked[]
+        D[:export_hardening] = cb_exp_hardening.checked[]
+        D[:export_plot]  = cb_exp_plot.checke[]
+        export_data(D)
 
     end
 
