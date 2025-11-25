@@ -86,7 +86,7 @@ function main(data = nothing;
             :export_px_per_unit => 2, #plot output resolution scaling
             # plot
             :figure => fig,
-            :axis => axss,   
+            :axis => axss,  #can be changed to draw somewhere else...  
             :plot_rawdata => true, #plot the rawdata ?
             :plot_modulus => true, #plot E modulus line ?
             :plot_elastic_range =>true, #plot the elastic range ?
@@ -131,7 +131,7 @@ function main(data = nothing;
         gl_block = GridLayout(sidebar[i, 1])
 
         controls = GridLayout()
-        draw_controls!(fig, controls, CURVEDATA)
+        draw_controls!(controls, CURVEDATA)
         make_button_block!(gl_block, controls;
                             btn_label,
                             btn_width = CURVEDATA[:sidebar_sub_width]/3)
@@ -552,8 +552,9 @@ end
 
 
 
-function draw_overview_controls!(fig::Figure, Lay::GridLayout, D::Dict{Symbol, Any})
-    @assert hasallkeys(D, [:is_true_stress, :name, :sidebar_sub_width])
+function draw_overview_controls!(Lay::GridLayout, D::Dict{Symbol, Any})
+    @assert hasallkeys(D, [:is_true_stress, :name, :sidebar_sub_width, :figure])
+    fig = D[:figure]
 
     cb_true_stress = Checkbox(fig, checked = false)
     
@@ -590,9 +591,10 @@ function draw_overview_controls!(fig::Figure, Lay::GridLayout, D::Dict{Symbol, A
 end
 
 
-function draw_true_stress_controls!(fig::Figure, Lay::GridLayout, D::Dict{Symbol, Any})
+function draw_true_stress_controls!(Lay::GridLayout, D::Dict{Symbol, Any})
 
-    @assert hasallkeys(D, [:resample_menu_options, :sidebar_sub_width])
+    @assert hasallkeys(D, [:resample_menu_options, :sidebar_sub_width, :figure])
+    fig = D[:figure]
 
     resample_menu = Menu(fig, options = D[:resample_menu_options],
                                 default = "Linear", width = D[:sidebar_sub_width] * 0.5)
@@ -702,9 +704,10 @@ end
 
 
 
-function draw_emodulus_controls!(fig::Figure, Lay::GridLayout, D::Dict{Symbol, Any})
+function draw_emodulus_controls!(Lay::GridLayout, D::Dict{Symbol, Any})
 
-    @assert hasallkeys(D, [:max_elastic_range, :sidebar_sub_width])
+    @assert hasallkeys(D, [:max_elastic_range, :sidebar_sub_width, :figure])
+    fig = D[:figure]
 
     # sldvals = get_slider_range_values(SSE)
     sldvals = (;vmin = 10.0, vmax = 1e6, value = 50_000.0)
@@ -815,9 +818,10 @@ function draw_emodulus_controls!(fig::Figure, Lay::GridLayout, D::Dict{Symbol, A
 end
 
 
-function draw_hardening_controls!(fig::Figure, Lay::GridLayout, D::Dict{Symbol, Any})
+function draw_hardening_controls!(Lay::GridLayout, D::Dict{Symbol, Any})
 
-    @assert hasallkeys(D, [:sidebar_sub_width, :menu_hardening_fit_options])
+    @assert hasallkeys(D, [:sidebar_sub_width, :menu_hardening_fit_options, :figure])
+    fig = D[:figure]
 
     fit_menu = Menu(fig, options = D[:menu_hardening_fit_options],
                     default = "Linear",
@@ -885,9 +889,10 @@ function draw_hardening_controls!(fig::Figure, Lay::GridLayout, D::Dict{Symbol, 
 end
 
 
-function draw_export_controls!(fig::Figure, Lay::GridLayout, D::Dict{Symbol, Any})
+function draw_export_controls!(Lay::GridLayout, D::Dict{Symbol, Any})
 
-    @assert hasallkeys(D, [:sidebar_sub_width])
+    @assert hasallkeys(D, [:sidebar_sub_width, :figure])
+    fig = D[:figure]
 
     btn_export = Button(fig, label = "Export")
 
@@ -930,7 +935,7 @@ Generates a block with toggleable visibility via a top button.
 function make_button_block!(main_GL::GridLayout, controls::GridLayout; #holds the widget and behavior
                         btn_label= "Show / Hide", #what to show on the button
                         btn_width = 50,
-                        is_visible = false,
+                        is_visible = false, #how it should look the 1st time
                         btn_halign = :left,
                         btn_fontsize = 16,
                         btn_font = :italic,
