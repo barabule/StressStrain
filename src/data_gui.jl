@@ -51,8 +51,8 @@ function data_gui(parent_screen::GLMakie.Screen , #GLFW screen to be able to clo
     
     ####################################################################################################################
     
-    slider_strain_col = Slider(fig, range = 1:Imported[:num_cols], startvalue = 1, width = 60)
-    slider_stress_col = Slider(fig, range = 1:Imported[:num_cols], startvalue = 2, width = 60)
+    slider_strain_col = Slider(fig, range = 1:Imported[:num_cols], startvalue = 1, width = sidebar_width/5)
+    slider_stress_col = Slider(fig, range = 1:Imported[:num_cols], startvalue = 2, width = sidebar_width/5)
 
     tb_strain_mult = Textbox(fig, 
                         validator = Float64,
@@ -73,6 +73,7 @@ function data_gui(parent_screen::GLMakie.Screen , #GLFW screen to be able to clo
     lab_stress_col = Label(fig, "Stress column: 2")
 
     control_gl[1,1] = vgrid!(
+            Label(fig, "Number of columns detected: $(Imported[:num_cols])"),
             hgrid!(lab_strain_col, slider_strain_col),
             hgrid!(lab_stress_col, slider_stress_col),
             hgrid!(Label(fig, "Strain multiplier:"), tb_strain_mult),
