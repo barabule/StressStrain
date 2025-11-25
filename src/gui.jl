@@ -32,7 +32,9 @@ function main(data = nothing;
     
     fig = Figure(title = "Elasto Plastic Fitter")
     
-    axss = initialize_axis(fig)
+    axss = Axis(fig[1,1], title = "Stress Strain",
+                    xlabel = "True Strain [-]",
+                    ylabel = "True Stress [MPa]")
 
 
     #holds the state
@@ -43,6 +45,7 @@ function main(data = nothing;
             :sidebar_width => sidebar_width,
             :sidebar_sub_width => sidebar_sub_width,
             :status_label => nothing, #here goes the status label handle
+            :modulus_slider => nothing, #handle to the modulus_slider
             # resampling 
             :resample_menu_options => zip(resamplefunclabels, resamplefuncs),
             :menu_hardening_fit_options => zip(fitfunclabels, fitfuncs),
@@ -113,7 +116,7 @@ function main(data = nothing;
 
     ################# SIDEBAR BLOCKS #############################################################################
 
-    sld_modulus = nothing
+    
 
     for (i, entry) in enumerate(
                                     (   
@@ -129,11 +132,7 @@ function main(data = nothing;
         gl_block = GridLayout(sidebar[i, 1])
 
         controls = GridLayout()
-        if i==3 #get a handle to the modulus slider
-            sld_modulus = draw_controls!(fig, controls, CURVEDATA)
-        else
-            draw_controls!(fig, controls, CURVEDATA)
-        end
+        draw_controls!(fig, controls, CURVEDATA)
         make_button_block!(gl_block, controls;
                             btn_label,
                             btn_width = CURVEDATA[:sidebar_sub_width]/3)
@@ -169,7 +168,7 @@ function main(data = nothing;
 
     label_status = Label(gl_bot_sub[2,:], "Status", tellwidth = false)
     CURVEDATA[:status_label] = label_status
-
+    
     Box(gl_bot[1,1], 
             linestyle = :solid,
             height = bottom_panel_height,
@@ -197,13 +196,15 @@ function main(data = nothing;
         # update_SSE!(SSE; recompute_modulus = true)
         recompute_data!(CURVEDATA)
         
-        update_modulus_slider!(sld_modulus, CURVEDATA)
+        update_modulus_slider!(CURVEDATA)
         update_stress_plot(CURVEDATA)
         update_status_label!(CURVEDATA)
     end
 
 
     ##################    WINDOW   ################################################################
+
+    update_status_label!(CURVEDATA)
 
     screen = GLMakie.Screen()
     GLFW.SetWindowTitle(screen.glscreen, "Stress Strain Fitter")
@@ -481,7 +482,8 @@ function get_slider_range_values(E, TT; sigdigits = 2)
     return (;value = E, vmin = Emin, vmax = Emax)
 end
 
-function update_modulus_slider!(sld, D::Dict{Symbol, Any})
+function update_modulus_slider!(D::Dict{Symbol, Any})
+    sld = D[:modulus_slider]
     E = D[:e_modulus]
     TT = D[:true_stress]
     sldvals = get_slider_range_values(E, TT)
@@ -500,15 +502,8 @@ function update_status_label!(D::Dict{Symbol, Any})
 end
 
 
-function initialize_axis(fig)
-    return Axis(fig[1,1], title = "Stress Strain",
-                    xlabel = "True Strain [-]",
-                    ylabel = "True Stress [MPa]")
 
-end
-
-
-#TODO may be nicer plot
+#TODO may be nicer plot (Cairomakie?)
 function export_data(D::Dict{Symbol, Any})
 
     true_stress = D[:true_stress]
@@ -732,6 +727,7 @@ function draw_emodulus_controls!(fig::Figure, Lay::GridLayout, D::Dict{Symbol, A
                     update_while_dragging =true,
                     width = D[:sidebar_sub_width],
                     )
+    D[:modulus_slider] = sld_modulus
 
     max_elastic_range = D[:max_elastic_range]
 
