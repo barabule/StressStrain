@@ -34,24 +34,42 @@ function main(data = nothing;
     #holds the state
     CURVEDATA = Dict{Symbol, Any}(
             :name => "Material",
-            :is_true_stress => false,
-            :is_overview_block_visible => Observable(false), 
+            # 
             :sidebar_width => sidebar_width,
             :sidebar_sub_width => sidebar_sub_width,
+            # resampling 
             :resample_menu_options => zip(resamplefunclabels, resamplefuncs),
             :menu_hardening_fit_options => zip(fitfunclabels, fitfuncs),
+            :resampler => first(resamplefuncs), #resampling function
+            # elastic properties
+            :e_modulus => 1.0,
             :max_elastic_range => 5e-3,
+            :is_fixed_modulus => false, #is the modulus fixed during recomputations ?
+            #data source
+            :is_true_stress => false,
+            :rawdata => data, #this is the actual raw data from the import- must not be changed
+            :base_data => deepcopy(data), #this is the basis for all the computations - can be changed
+            # tunable
+            :hardening_offset => 2e-3,
+            :toe_in => 0.0, #cut the beginning of base_data and shift
+            :cutoff => last(data.strain), # cut at the end
+            #recomputable
+            :true_stress =>(;strain = [], stress = []),
+            :hardening =>(;strain = [], stress = []),
+            # export
+            :export_density => 100, # how many pts to export
+            :export_true_stress => true,
+            :export_hardening => true,
+            :export_plot => true,
+            :export_format_delim => ',',
+            :export_format_ext => ".csv",
+            :export_folder => nothing, #where to export
+            
     )
 
 
     fig = Figure(title = "Elasto Plastic Fitter")
     
-    
-
-    
-
-    
-
     axss = initialize_axis(fig)
 
 
