@@ -39,6 +39,7 @@ function main(data = nothing;
             :sidebar_width => sidebar_width,
             :sidebar_sub_width => sidebar_sub_width,
             :resample_menu_options => zip(resamplefunclabels, resamplefuncs),
+            :max_elastic_range => 5e-3,
     )
 
 
@@ -110,65 +111,65 @@ function main(data = nothing;
     ############## Emod ################################################################################################
     
 
-    btn_emodulus_edit = Button(emod_gl_sub[1,:], 
-                            label = "E Modulus", 
-                            fontsize = 16, 
-                            font =:italic, 
-                            halign = :left,
-                            )
+    emodulus_controls = GridLayout()
+    draw_emodulus_controls!(fig, emodulus_controls, CURVEDATA)
+    make_button_block!(emod_gl, emodulus_controls;
+                    btn_label = "E Modulus",
+                    btn_width = CURVEDATA[:sidebar_sub_width]/3)
 
-    sldvals = get_slider_range_values(SSE)
+
+    # sldvals = get_slider_range_values(SSE)
     
 
-    sld_modulus = Slider(fig, 
-                    range = LinRange(sldvals.vmin, sldvals.vmax, 1001),
-                    startvalue= sldvals.value,
-                    update_while_dragging =true,
-                    width = sidebar_sub_width,
-                    )
+    # sld_modulus = Slider(fig, 
+    #                 range = LinRange(sldvals.vmin, sldvals.vmax, 1001),
+    #                 startvalue= sldvals.value,
+    #                 update_while_dragging =true,
+    #                 width = sidebar_sub_width,
+    #                 )
 
-    max_elastic_range = SSE["max elastic range"]
+    # max_elastic_range = SSE["max elastic range"]
 
-    sld_elastic_range = Slider(fig,
-                    range = LinRange(0.0, max_elastic_range, 1000),
-                    startvalue = 1e-3,
-                    update_while_dragging = true,
-                    width = 0.4 * sidebar_sub_width,
-                    )
+    # sld_elastic_range = Slider(fig,
+    #                 range = LinRange(0.0, max_elastic_range, 1000),
+    #                 startvalue = 1e-3,
+    #                 update_while_dragging = true,
+    #                 width = 0.4 * sidebar_sub_width,
+    #                 )
 
-    lab_elastic_range_val = Label(fig, "0.001")
+    # lab_elastic_range_val = Label(fig, "0.001")
 
-    lab_modulus = Label(fig, "E = ")
+    # lab_modulus = Label(fig, "E = ")
 
-    tb_modulus = Textbox(fig, 
-                            placeholder = "$(round(sld_modulus.value[]; sigdigits= 3))MPa",
-                            validator = Float64,
-                            width = 0.4 * sidebar_sub_width,
-                            )
+    # tb_modulus = Textbox(fig, 
+    #                         placeholder = "$(round(sld_modulus.value[]; sigdigits= 3))MPa",
+    #                         validator = Float64,
+    #                         width = 0.4 * sidebar_sub_width,
+    #                         )
 
 
-    sld_offset = Slider(fig,
-                range= LinRange(1e-3, 0.1, 100),
-                startvalue = 2e-3,
-                update_while_dragging = false,
+    # sld_offset = Slider(fig,
+    #             range= LinRange(1e-3, 0.1, 100),
+    #             startvalue = 2e-3,
+    #             update_while_dragging = false,
                 
-                )
+    #             )
 
-    cb_fixed = Checkbox(fig, checked = false)
+    # cb_fixed = Checkbox(fig, checked = false)
     
-    lab_offset = Label(fig, "Offset = $(round(sld_offset.value[]; sigdigits = 3))")
+    # lab_offset = Label(fig, "Offset = $(round(sld_offset.value[]; sigdigits = 3))")
     
 
-    emod_gl_sub[2,:] = vgrid!(
-        # Label(fig, "E Modulus", fontsize = 20, font =:italic),
-        hgrid!(lab_modulus, tb_modulus, Label(fig, "MPa")),
-        sld_modulus,
-        hgrid!(Label(fig, "Fix Modulus"), cb_fixed),
-        hgrid!(Label(fig, "Elastic range "), sld_elastic_range, lab_elastic_range_val),
-        hgrid!(lab_offset, sld_offset),
-        ;
-        width = sidebar_sub_width,
-    )
+    # emod_gl_sub[2,:] = vgrid!(
+    #     # Label(fig, "E Modulus", fontsize = 20, font =:italic),
+    #     hgrid!(lab_modulus, tb_modulus, Label(fig, "MPa")),
+    #     sld_modulus,
+    #     hgrid!(Label(fig, "Fix Modulus"), cb_fixed),
+    #     hgrid!(Label(fig, "Elastic range "), sld_elastic_range, lab_elastic_range_val),
+    #     hgrid!(lab_offset, sld_offset),
+    #     ;
+    #     width = sidebar_sub_width,
+    # )
 
     ################ Hardening #########################################################################################
 
@@ -312,42 +313,11 @@ function main(data = nothing;
     # end
 
     
-    on(sld_modulus.value) do val
-        update_SSE!(SSE; modulus = round(val; sigdigits =3), alg)
-        update_stress_plot!(axss, SSE; N)
-        tb_modulus.displayed_string = "$(round(sld_modulus.value[]; sigdigits= 3))"
-        update_status_label!(label_status, SSE)
-    end
-
-    on(sld_elastic_range.value) do val
-        SSE["elastic range"] = val
-        lab_elastic_range_val.text = string(round(val;sigdigits = 4))
-        update_SSE!(SSE)
-        update_stress_plot!(axss, SSE; N)
-        update_status_label!(label_status, SSE)
-    end
-
-    on(tb_modulus.stored_string) do s
-        #update modulus only in the checkbox is unchecked
-        if !cb_fixed.checked[]
-            modulus = round(parse(Float64, s); sigdigits = 3)
-            update_SSE!(SSE; modulus)
-            update_stress_plot!(axss, SSE;N)
-            update_status_label!(label_status, SSE)
-        end
-    end
+    
 
     
-    on(cb_fixed.checked) do val
-        SSE["fixed modulus"] = val
-    end
 
-    on(sld_offset.value) do val
-        SSE["hardening offset"] = val
-        update_SSE!(SSE;recompute_modulus =false)
-        update_stress_plot!(axss, SSE; N)
-        lab_offset.text = "Offset = $(round(sld_offset.value[]; sigdigits = 3))"
-    end
+    
 
     on(fit_menu.selection) do s
         
@@ -969,6 +939,106 @@ function draw_true_stress_controls!(fig::Figure, Lay::GridLayout, D::Dict{Symbol
 
     return nothing
 end
+
+
+
+function draw_emodulus_controls!(fig, Lay::GridLayout, D::Dict{Symbol, Any})
+
+    @assert hasallkeys(D, [:max_elastic_range, :sidebar_sub_width])
+
+    # sldvals = get_slider_range_values(SSE)
+    sldvals = (;vmin = 10.0, vmax = 1e6, value = 50_000.0)
+
+
+    sld_modulus = Slider(fig, 
+                    range = LinRange(sldvals.vmin, sldvals.vmax, 1001),
+                    startvalue= sldvals.value,
+                    update_while_dragging =true,
+                    width = D[:sidebar_sub_width],
+                    )
+
+    max_elastic_range = D[:max_elastic_range]
+
+    sld_elastic_range = Slider(fig,
+                    range = LinRange(0.0, max_elastic_range, 1000),
+                    startvalue = 1e-3,
+                    update_while_dragging = true,
+                    width = 0.4 * D[:sidebar_sub_width],
+                    )
+
+    lab_elastic_range_val = Label(fig, "0.001")
+
+    lab_modulus = Label(fig, "E = ")
+
+    tb_modulus = Textbox(fig, 
+                            placeholder = "$(round(sld_modulus.value[]; sigdigits= 3))MPa",
+                            validator = Float64,
+                            width = 0.4 * D[:sidebar_sub_width],
+                            )
+
+
+    sld_offset = Slider(fig,
+                range= LinRange(1e-3, 0.1, 100),
+                startvalue = 2e-3,
+                update_while_dragging = false,
+                
+                )
+
+    cb_fixed = Checkbox(fig, checked = false)
+    
+    lab_offset = Label(fig, "Offset = $(round(sld_offset.value[]; sigdigits = 3))")
+    
+
+    Lay[1, 1] = vgrid!(
+        hgrid!(lab_modulus, tb_modulus, Label(fig, "MPa")),
+        sld_modulus,
+        hgrid!(Label(fig, "Fix Modulus"), cb_fixed),
+        hgrid!(Label(fig, "Elastic range "), sld_elastic_range, lab_elastic_range_val),
+        hgrid!(lab_offset, sld_offset),
+        ;
+        width = D[:sidebar_sub_width],
+    )
+
+#########BEHAVIOR ####################################################################
+    on(sld_modulus.value) do val
+        # update_SSE!(SSE; modulus = round(val; sigdigits =3), alg)
+        # update_stress_plot!(axss, SSE; N)
+        # tb_modulus.displayed_string = "$(round(sld_modulus.value[]; sigdigits= 3))"
+        # update_status_label!(label_status, SSE)
+    end
+
+    on(sld_elastic_range.value) do val
+        # SSE["elastic range"] = val
+        # lab_elastic_range_val.text = string(round(val;sigdigits = 4))
+        # update_SSE!(SSE)
+        # update_stress_plot!(axss, SSE; N)
+        # update_status_label!(label_status, SSE)
+    end
+
+    on(tb_modulus.stored_string) do s
+        #update modulus only in the checkbox is unchecked
+        # if !cb_fixed.checked[]
+        #     modulus = round(parse(Float64, s); sigdigits = 3)
+        #     update_SSE!(SSE; modulus)
+        #     update_stress_plot!(axss, SSE;N)
+        #     update_status_label!(label_status, SSE)
+        # end
+    end
+
+    
+    on(cb_fixed.checked) do val
+        SSE["fixed modulus"] = val
+    end
+
+    on(sld_offset.value) do val
+        SSE["hardening offset"] = val
+        update_SSE!(SSE;recompute_modulus =false)
+        update_stress_plot!(axss, SSE; N)
+        lab_offset.text = "Offset = $(round(sld_offset.value[]; sigdigits = 3))"
+    end
+
+end
+
 
 """
     make_button_block!(main_GL::GridLayout, controls::GridLayout; #holds the widget and behavior
