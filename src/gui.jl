@@ -28,19 +28,28 @@ function main(data = nothing;
     sidebar_sub_width = subscale * sidebar_width
     bottom_panel_sub_height = subscale * bottom_panel_height
 
-    SSE, fitfuncs, fitfunclabels, resamplefuncs, resamplefunclabels = initialize(data; resample_density)
+    export_folder, fitfuncs, fitfunclabels, resamplefuncs, resamplefunclabels = initialize(data; resample_density)
     
+    fig = Figure(title = "Elasto Plastic Fitter")
     
+    axss = initialize_axis(fig)
+
+
     #holds the state
     CURVEDATA = Dict{Symbol, Any}(
+            #general
             :name => "Material",
-            # 
+            # gui
             :sidebar_width => sidebar_width,
             :sidebar_sub_width => sidebar_sub_width,
             # resampling 
             :resample_menu_options => zip(resamplefunclabels, resamplefuncs),
             :menu_hardening_fit_options => zip(fitfunclabels, fitfuncs),
             :resampler => first(resamplefuncs), #resampling function
+            :resample_density => 100, #how many points to resample the true stress curve
+            :hardening_interpolant => first(fitfuncs), #function to fit hardening curve
+            :alg => alg, #optimization algorithm for fitting hardening portion
+            :max_plastic_strain => 0.0, #plastic strain to extrapolate to
             # elastic properties
             :e_modulus => 1.0,
             :max_elastic_range => 5e-3,
@@ -48,33 +57,51 @@ function main(data = nothing;
             #data source
             :is_true_stress => false,
             :rawdata => data, #this is the actual raw data from the import- must not be changed
-            :base_data => deepcopy(data), #this is the basis for all the computations - can be changed
             # tunable
             :hardening_offset => 2e-3,
-            :toe_in => 0.0, #cut the beginning of base_data and shift
+            :toein => 0.0, #cut the beginning of base_data and shift
             :cutoff => last(data.strain), # cut at the end
             #recomputable
-            :true_stress =>(;strain = [], stress = []),
-            :hardening =>(;strain = [], stress = []),
-            # export
+            :base_data => deepcopy(data), #this is the basis for all the computations - can be changed by resampling
+            :resample_base_data => false, #resample base_data with resampler function
+            :recompute_modulus => true,
+            :recompute_true_stress => true, 
+            :recompute_hardening_portion => true,
+            :recompute_hardening_fit => true,
+            :true_stress =>(;strain = [], stress = []), #modified from base_data
+            :hardening_portion =>(;strain = [], stress = []),#modified from true_stress
+            :hardening_fitter => nothing, #actual interpolant after fit
+            # export settings
             :export_density => 100, # how many pts to export
             :export_true_stress => true,
             :export_hardening => true,
             :export_plot => true,
             :export_format_delim => ',',
             :export_format_ext => ".csv",
-            :export_folder => nothing, #where to export
+            :export_folder => export_folder, #where to export
+            :export_density => 100, #how many points to export
+            # plot
+            :figure => fig,
+            :axis => axss,   
+            :plot_rawdata => false, #plot the rawdata ?
+            :plot_modulus => true, #plot E modulus line ?
+            :plot_elastic_range =>true, #plot the elastic range ?
+            :plot_base_data => true, #plot the base data ?
+            :plot_true_stress => true, #plot the true stress ?
+            :plot_hardening_portion => true, #plot the hardening portion ?
+            :plot_hardening_fit => true, #plot the hardening fit ?
+            :plot_hardening_offset => true,  #plot the hardening offset line ?
+            :plot_cutoff_limits => true,  #plot the toein and cutoff vlines ?
+            :plot_density => N, #how many points to plot 
+            :plot_px_per_unit => 2, #plot output resolution scaling
+            :plot_format => :png,        
             
     )
 
+    # update_stress_plot!(axss, SSE; N)
+    recompute_data!(CURVEDATA)
+    update_stress_plot(CURVEDATA)
 
-    fig = Figure(title = "Elasto Plastic Fitter")
-    
-    axss = initialize_axis(fig)
-
-
-    update_stress_plot!(axss, SSE; N)
-    
     # xlims!(axss, low = 0)
     ylims!(axss, low = 0) #don't care about negative crap
     
@@ -85,6 +112,8 @@ function main(data = nothing;
 
 
     ################# SIDEBAR BLOCKS #############################################################################
+
+    sld_modulus = nothing
 
     for (i, entry) in enumerate(
                                     (   
@@ -100,7 +129,11 @@ function main(data = nothing;
         gl_block = GridLayout(sidebar[i, 1])
 
         controls = GridLayout()
-        draw_controls!(fig, controls, CURVEDATA)
+        if i==3 #get a handle to the modulus slider
+            sld_modulus = draw_controls!(fig, controls, CURVEDATA)
+        else
+            draw_controls!(fig, controls, CURVEDATA)
+        end
         make_button_block!(gl_block, controls;
                             btn_label,
                             btn_width = CURVEDATA[:sidebar_sub_width]/3)
@@ -114,12 +147,14 @@ function main(data = nothing;
             cornerradius = 10,
             z = -100)
 
+        
+
     end
 
     ################## Bottom Panel ####################################################################################
 
-    sld_int = IntervalSlider(gl_bot_sub[1,2], range = LinRange(0, last(SSE["true stress"].strain), 1000),
-                    startvalues = (0.0, last(SSE["true stress"].strain)))
+    sld_int = IntervalSlider(gl_bot_sub[1,2], range = LinRange(0, last(CURVEDATA[:true_stress].strain), 1000),
+                    startvalues = (0.0, last(CURVEDATA[:true_stress].strain)))
     
     
     
@@ -150,23 +185,25 @@ function main(data = nothing;
         println(f1)
         
         data_gui(screen, f1)
-        update_stress_plot!(axss, SSE)
+        update_stress_plot!(CURVEDATA)
     end
 
 
     on(sld_int.interval) do intv
         lo, hi = intv
-        SSE["toein"] = lo
-        SSE["cut off"] = hi
-        update_SSE!(SSE; recompute_modulus = true)
+        CURVEDATA[:toein] = lo
+        CURVEDATA[:cutoff] = hi
+        # update_SSE!(SSE; recompute_modulus = true)
+        recompute_data!(CURVEDATA)
         
-        update_modulus_slider!(sld_modulus, SSE)
-        update_stress_plot!(axss, SSE;N)
-        update_status_label!(label_status, SSE)
+        update_modulus_slider!(sld_modulus, CURVEDATA)
+        update_stress_plot!(CURVEDATA)
+        update_status_label!(label_status, CURVEDATA)
     end
 
 
     ##################    WINDOW   ################################################################
+
     screen = GLMakie.Screen()
     GLFW.SetWindowTitle(screen.glscreen, "Stress Strain Fitter")
     return display(screen, fig)
@@ -176,13 +213,12 @@ end
 
 
 
-function update_stress_plot!(ax, SSE; 
-                        N = 100, 
-                        tmax = SSE["export max strain"],
-                        )
+function update_stress_plot(D::Dict{Symbol, Any})
 
+    ax = D[:axis]
+    fig = D[:figure]
     empty!(ax)
-    fig = ax.parent
+    
     #delete the legend
     for (i, block) in enumerate(fig.content)
         if block isa Makie.Legend
@@ -191,110 +227,93 @@ function update_stress_plot!(ax, SSE;
         end
     end
 
+    ax.title = D[:name]
 
-    ax.title = SSE["name"]
-    #original data
-    if haskey(SSE, "original data")
-        OD = SSE["original data"]
-        scatter!(ax, OD.strain, OD.stress, color = (:grey90, 0.7), markersize = 10, label = "original")
+    if D[:plot_rawdata]
+        RD = D[:rawdata]
+        scatter!(ax, RD.strain, RD.stress, 
+                color = (:grey90, 0.7),
+                markersize = 10,
+                label = "Original Data",
+                )
     end
-    #rawdata
-    tss = SSE["true stress"]
-    if !SSE["is true"]
-        ### Engineering Stress Plot
-        RD = SSE["rawdata"]
-        scatterlines!(ax, RD.strain, RD.stress, 
-                    color = (:grey10, 0.5), 
-                    marker = 'o', markersize = 10, label = "Raw Data (Engineering)")
 
-    end
-    ### True Stress Plot
-    scatterlines!(ax, tss.strain, tss.stress,
-                    label= "True Stress (Exp)",
+    if D[:plot_true_stress]
+        BD = D[:base_data]
+        if !D[:is_true_stress] #engineering 
+            scatterlines!(ax, BD.strain, BD.stress, 
+                            color = (:grey10, 0.5), 
+                            marker = 'o', 
+                            markersize = 10, 
+                            label = "Raw Data (Engineering)")
+        end
+        tss = D[:true_stress]
+        scatterlines!(ax, tss.strain, tss.stress,
+                        label= "True Stress (Exp)",
                         color = (:grey50, 0.5), marker = :diamond, 
                         markercolor = (:black, 0.5), 
                         markersize = 20)
+    end
 
-    ### Hardening Curve Plot
-    t = LinRange(0.0, tmax, N)
-    hss = SSE["hardening"]
-    scatter!(ax, hss.strain, hss.stress, 
-                label = "Hardening Portion (Exp)",
-                color = :red, marker = :cross, alpha = 0.9, markersize = 20)
+    if D[:plot_hardening_portion]
+        HD = D[:hardening_portion]
+        scatter!(ax, HD.strain, HD.stress,
+                )
+    end
 
-    lines!(ax, t , SSE["hardening fit"](t), color = :black, label = "Hardening Law (Fit)", linewidth = 4.0)
+    if D[:plot_hardening_fit]
+        hss = D[:hardening_fitter]
+        epi = LinRange(0, D[:max_plastic_strain], D[:plot_density])
+        ssi = hss.(epi)
+        lines!(ax, epi, ssi, 
+                    color =:black, 
+                    label = "Hardening Law (Fit)", 
+                    linewidth = 4.0)
+    end
+
+    if D[:plot_modulus] #E modulus plot
+        E = D[:e_modulus]
+        
+        smax = maximum(D[:hardening_portion].stress)
+        tmax = smax / E
+        tmax = min(last(D[:true_stress].strain), tmax)
+        tlin = LinRange(0, tmax, 10)
+        slin = E .* tlin
+        lines!(ax, tlin, slin, linestyle = :dash, color = :red)
+
+        if D[:plot_hardening_offset]#hardening offset
+            lines!(ax, tlin .+ D[:hardening_offset], slin, color = (:red, 0.3), linestyle = :solid )
+        end
+    end
     
-    #E modulus plot
-    E = SSE["modulus"]
-    smax = maximum(SSE["hardening"].stress)
-    tmax = smax / E
-    tmax = min(last(SSE["true stress"].strain), tmax)
-    tlin = LinRange(0, tmax, 10)
-    slin = E .* tlin
-    lines!(ax, tlin, slin, linestyle = :dash, color = :red)
-    #hardening offset
-    lines!(ax, tlin .+ SSE["hardening offset"],slin, color = (:red, 0.3), linestyle = :solid )
-    #elastic range
-    vlines!(ax, [SSE["elastic range"]], color = (:grey50, 0.5), linestyle = :solid)
-    ### Cutoff limits
-    vlines!(ax, [SSE["toein"], SSE["cut off"]], color= :black, linestyle = :dash)
+    if D[:plot_cutoff_limits]
+        vlines!(ax, [D[:toein], D[:cutoff]], color= :black, linestyle = :dash)
 
+    end
+    
+    if D[:plot_elastic_range]
+        vlines!(ax, [D[:max_elastic_range]], color = (:grey50, 0.5), linestyle = :solid)
+    end
+    
     axislegend(ax, position = :rb, merge = true)
 
     return nothing
 end
 
 
-function get_initial_SSE(strain, stress; resample_density = 20)
-
-    SSE = Dict{String, Any}(
-        "name" => "Material", 
-        "is true" => false, #is rawdata true stress ? 
-        "rawdata" => (;strain, stress), #do not change
-        "hardening offset" => 2e-3, #offset to use to extract hardening curve
-        "export density"=> 100, #number of points to export
-        "resample density" => resample_density, #number of points to resample rawdata
-        "resampler"=> LinearInterpolation,
-        "toein" => 0.0,    
-        "cut off" => last(strain), #cut off value for true stress curve    
-        "export folder" => nothing,
-        "fixed modulus"=> false, #if this is set, modulus cannot change
-        "elastic range" => 1e-3, #how much of the starting portion to use to compute modulus
-        "max elastic range" => last(strain), #max strain value for elastic behavior 
-        "BSpline approximation knots" => 4, #how many control points for BSpline approx
-        "BSpline degree" => 3, 
-        )
-    
-    push!(SSE, "modulus" => get_modulus(SSE["rawdata"]))
-    push!(SSE, "true stress" => engineering_to_true(SSE["rawdata"]))
-    
-    push!(SSE, "hardening" => get_hardening_portion(SSE["true stress"], 
-                                                       SSE["modulus"]; 
-                                                       offset = SSE["hardening offset"])
-        )
-
-    push!(SSE, "export max strain" => maximum(SSE["rawdata"].strain))
-
-    return SSE
-end
 
 
-function initialize(data = nothing;
+function initialize(data;
                     alg = NelderMead(), 
                     resample_density = 20,
                     )
 
-    if isnothing(data) #make up something
-        strain = LinRange(0, 0.1, 20)
-        stress = 100.0 .* strain .^ 0.2
-    else
-        strain, stress = data
-    end
-
-    SSE = get_initial_SSE(strain ,stress; resample_density)
+    @assert hasallkeys(data, [:strain, :stress])
 
     if haskey(data, :folder)
-        SSE["export folder"] = data.folder
+        export_folder = data.folder
+    else
+        export_folder = nothing
     end
 
     fitfuncs = [LinearInterpolation, 
@@ -345,166 +364,136 @@ function initialize(data = nothing;
         "RambergOsgoodAlt",
     ]
 
-    push!(SSE, "interpolant" => fitfuncs[1])
-
-    if !issorted(SSE["hardening"].strain)
-        @warn "strain is not sorted", SSE["hardening"].strain[1:100]
-        @info "E modulus", SSE["modulus"]
-    end
-
-    push!(SSE, "hardening fit" => make_interpolant(SSE["interpolant"], SSE["hardening"]; alg))
-    
-    return (;SSE, fitfuncs, fitfunclabels, resamplefuncs, resamplefunclabels)
+    return (;export_folder, fitfuncs, fitfunclabels, resamplefuncs, resamplefunclabels)
 end
 
 
-function update_SSE!(SSE; 
-                        modulus = nothing,  #impose modulus
-                        recompute_modulus = true, #also triggers recalc
-                        alg = NelderMead(),
-                        resample = false, #modifies rawdata.. 
-    )
-    
-    if resample #modifies the original data
-        if !haskey(SSE, "original data") #first time
-            push!(SSE, "original data" => SSE["rawdata"])
-        end
-        RD = SSE["rawdata"]
-        if SSE["resampler"] != RambergOsgood || SSE["resampler"] 
-            resampled_data = resample_curve(RD.strain, RD.stress, SSE["resample density"];
-                                    resampler = SSE["resampler"],
-                                    d =3,
-                                    h = SSE["BSpline approximation knots"],
-                                    )
 
-            SSE["rawdata"] = (;strain = resampled_data[1], 
+
+function recompute_data!(D::Dict{Symbol, Any})
+
+    
+    
+    # 1. resample the base_data
+    if D[:resample_base_data]
+        BD = D[:base_data]
+        resampler = D[:resampler]
+        if resampler != RambergOsgood
+            resampled_data = resample_curve(BD.strain, BD.stress, D[:resample_density];
+                                            resampler,
+                                            )
+            D[:base_data] => (;strain = resampled_data[1],
                             stress = resampled_data[2])
         end
+
     end
-    
-    if SSE["toein"]>0.0
-        RD = toein_compensate(SSE["rawdata"]; 
-                                cut = SSE["toein"], 
-                                elastic_strain_offset = SSE["elastic range"],
-                            )
+
+    #2. check if toein
+    if D[:toein] > 0
+        BD = toein_compensate(D[:base_data];
+                            cut = D[:toein],
+                            elastic_strain_offset = D[:max_elastic_range])
     else
-        RD = SSE["rawdata"]
+        BD = D[:base_data]
     end
 
-    TS = SSE["is true"] ? RD : engineering_to_true(RD)
+    #3. get true stress 
+    TS = D[:is_true_stress] ? BD : engineering_to_true(BD)
 
-    SSE["true stress"] = cutoff(TS, SSE["cut off"])
+    #4. cutoff
+    D[:true_stress] = cutoff(TS, D[:cutoff])
 
-    if !SSE["fixed modulus"] #only allowed to change if modulus is not fixed
-        if !isnothing(modulus)
-            SSE["modulus"] = modulus
-        elseif recompute_modulus 
-            SSE["modulus"] = get_modulus(SSE["true stress"]; 
-                                            max_strain = SSE["elastic range"],
-                                        )
-        end
+    #5. compute E modulus
+    if D[:recompute_modulus]
+        D[:e_modulus] = get_modulus(D[:true_stress];
+                                    max_strain = D[:max_elastic_range])
     end
     
-    if SSE["resampler"] == RambergOsgood
-        resampled_data = resample_curve(SSE["true stress"].strain, 
-                                        SSE["true stress"].stress, 
-                                        length(SSE["true stress"].strain); #it's actually a fit
-                                        resampler = SSE["resampler"],
-                                        offset = SSE["hardening offset"],
-                                        E = SSE["modulus"],
+    #6. RambergOsgood 
+
+    if D[:resample_base_data] && D[:resampler] == RambergOsgood
+        resampled_data = resample_curve(D[:true_stress].strain,
+                                        D[:true_stress].stress,
+                                        length(D[:true_stess].strain);
+                                        resampler = D[:resampler],
+                                        offset = D[:hardening_offset],
+                                        E = D[:e_modulus],
                                         )
-        #update the true stress
-        SSE["true stress"] = (;strain = resampled_data[1],
-                                stress = resampled_data[2])
-                                        
+        D[:true_stress] = (;strain = resampled_data[1],
+                            stress = resampled_data[2])
     end
+    
+    
+    #7. Hardening Portion
+    if D[:recompute_hardening_portion]
+        D[:hardening_portion] = get_hardening_portion(D[:true_stress],
+                                                    D[:e_modulus];
+                                                    offset = D[:hardening_offset],
+                                                    )
+    end
+    # for plot /export 
+    D[:max_plastic_strain] = max(D[:max_plastic_strain], last(D[:hardening_portion].strain))
 
+    #8. update allowable elastic range
+    D[:max_elastic_range] = last(D[:true_stress].strain)
+    
 
-    SSE["hardening"] = get_hardening_portion(SSE["true stress"], 
-                                                SSE["modulus"]; 
-                                                offset = SSE["hardening offset"]
-                                                )
-    #update allowable elastic range
-    SSE["max elastic range"] = last(SSE["true stress"].strain)
-
-    if isnothing(SSE["hardening"]) #how to handle this gracefully
-        @warn "Hardening portion cannot be extracted!"
-        @info "Modulus ", SSE["modulus"]
-        @info "Hardening offset ", SSE["hardening offset"]
+    # if isnothing(SSE["hardening"]) #how to handle this gracefully
+    #     @warn "Hardening portion cannot be extracted!"
+    #     @info "Modulus ", SSE["modulus"]
+    #     @info "Hardening offset ", SSE["hardening offset"]
         
+    # end
+    #9. hardening fit
+    if D[:recompute_hardening_fit]
+        D[:hardening_fitter] = make_interpolant(D[:hardening_interpolant], D[:hardening_portion]; alg = D[:alg]) 
     end
-    
-    SSE["hardening fit"] = make_interpolant(SSE["interpolant"], SSE["hardening"]; alg)
 
     return nothing
+
 end
 
 
 
+# function change_true_status!(val::Bool, SSE)
 
-
-function change_true_status!(val::Bool, SSE)
-
-    SSE["is_true"] = val
-    update_SSE!(SSE)
-    return !val
-end
+#     SSE["is_true"] = val
+#     update_SSE!(SSE)
+#     return !val
+# end
 
 
 
 
 
-function get_slider_range_values(SSE; sigdigits = 2)
-    E = SSE["modulus"]
-    Ebracket = bracket_modulus(SSE["true stress"])
+function get_slider_range_values(E, TT; sigdigits = 2)
+    
+    Ebracket = bracket_modulus(TT)
     Emin = Ebracket.Emin
     Emax = Ebracket.Emax
-    if E < Emin || E > Emax
-        E = Emax
-        update_SSE!(SSE; modulus = E)
-    end
-    Emin = round(Emin;sigdigits)
-    Emax = 10round(Emax;sigdigits)
+
+    Emin = round(min(Emin, E); sigdigits)
+    Emax = round(max(Emax, E); sigdigits)
+
     return (;value = E, vmin = Emin, vmax = Emax)
 end
 
-
-function update_modulus_slider!(sld, SSE)
-
-    sldvals = get_slider_range_values(SSE)
+function update_modulus_slider!(sld, D::Dict{Symbol, Any})
+    E = D[:e_modulus]
+    TT = D[:true_stress]
+    sldvals = get_slider_range_values(E, TT)
     sld.range = LinRange(sldvals.vmin, sldvals.vmax, 1001)
     _ = set_close_to!(sld, sldvals.value)
     return nothing
 end
 
 
-
-function update_status_label!(label, SSE)
-    text = interpolant_label(SSE["hardening fit"], SSE["interpolant"])
+function update_status_label!(label, D::Dict{Symbol, Any})
+    text = interpolant_label(D[:hardening_fitter], D[:hardening_interpolant])
     # println(text)
-    E = "E = $(SSE["modulus"]) MPa, "
+    E = "E = $(D[:e_modulus]) MPa, "
     label.text = E * text
-    # println("label changed")
 end
-
-
-
-function reset_SSE!(SSE)
-    if haskey(SSE, "original data") 
-        
-        delete!(SSE, "rawdata")
-        push!(SSE, "rawdata" => SSE["original data"])
-        delete!(SSE,"original data")
-        update_SSE!(SSE)
-
-    end
-    
-    return nothing
-
-end
-
-
-
 
 
 function initialize_axis(fig)
@@ -571,6 +560,11 @@ function export_data(SSE;
 
 
     @info  "Done"
+end
+
+function export_data(D::Dict{Symbol, Any})
+
+
 end
 
 function draw_overview_controls!(fig::Figure, Lay::GridLayout, D::Dict{Symbol, Any})
@@ -781,9 +775,14 @@ function draw_emodulus_controls!(fig::Figure, Lay::GridLayout, D::Dict{Symbol, A
 #########BEHAVIOR ####################################################################
     on(sld_modulus.value) do val
         # update_SSE!(SSE; modulus = round(val; sigdigits =3), alg)
+        D[:e_modulus] = round(val; sigdigits =3)
+        D[:recompute_modulus] = false
+        recompute_data!(D)
+        D[:recompute_modulus] = true
         # update_stress_plot!(axss, SSE; N)
-        # tb_modulus.displayed_string = "$(round(sld_modulus.value[]; sigdigits= 3))"
-        # update_status_label!(label_status, SSE)
+        update_stress_plot(D)
+        tb_modulus.displayed_string = "$(round(sld_modulus.value[]; sigdigits= 3))"
+        update_status_label!(label_status, D)
     end
 
     on(sld_elastic_range.value) do val
@@ -810,12 +809,15 @@ function draw_emodulus_controls!(fig::Figure, Lay::GridLayout, D::Dict{Symbol, A
     end
 
     on(sld_offset.value) do val
-        # SSE["hardening offset"] = val
-        # update_SSE!(SSE;recompute_modulus =false)
-        # update_stress_plot!(axss, SSE; N)
-        # lab_offset.text = "Offset = $(round(sld_offset.value[]; sigdigits = 3))"
+        D[:hardening_offset] = val
+        D[:recompute_modulus] = false
+        recompute_data!(D)
+        D[:recompute_modulus] = true
+        update_stress_plot(D)
+        lab_offset.text = "Offset = $(round(sld_offset.value[]; sigdigits = 3))"
     end
 
+    return sld_modulus #need this for something
 end
 
 
