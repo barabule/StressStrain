@@ -24,11 +24,23 @@ function main(data = nothing;
 
 
     #########################GLOBALS####################################################################################
-
-    fig = Figure(title = "Elasto Plastic Fitter")
     
     sidebar_sub_width = subscale * sidebar_width
     bottom_panel_sub_height = subscale * bottom_panel_height
+    
+    #holds the state
+    CURVEDATA = Dict{Symbol, Any}(
+            :name => "Material",
+            :is_true_stress => false,
+            :is_overview_block_visible => Observable(false), 
+            :sidebar_width => sidebar_width,
+            :sidebar_sub_width => sidebar_sub_width,
+    )
+
+
+    fig = Figure(title = "Elasto Plastic Fitter")
+    
+    
 
     
 
@@ -51,12 +63,14 @@ function main(data = nothing;
     
 
 
-    #subsub
-    overview_gl_sub    = GridLayout(overview_gl[1,1], width = sidebar_sub_width, alignmode = Outside(10))
+    #Gl to hold the controls
+    overview_gl_sub    = GridLayout(overview_gl[2,1], width = sidebar_sub_width, alignmode = Outside(10))
     true_stress_gl_sub = GridLayout(true_stress_gl[1,1], width = sidebar_sub_width, alignmode = Outside(10))
     emod_gl_sub        = GridLayout(emod_gl[1,1], width = sidebar_sub_width, alignmode = Outside(10))
     hardening_gl_sub   = GridLayout(hardening_gl[1,1], width = sidebar_sub_width, alignmode = Outside(10))
-
+    #GL to hold the hidden controls
+    empty_layout = GridLayout()
+    overview_gl_sub_hidden = GridLayout(bbox = (0, 0, -100, -100)) #hidden gl for overview controls
 
 
     gl_bot = GridLayout(fig[2, 1], height = bottom_panel_height, tellwidth = false)
@@ -74,27 +88,20 @@ function main(data = nothing;
     ############## Overview ############################################################################################
 
     # Label(overview_gl_sub[1, :], "Overview", fontsize = 20, font =:italic)
-    btn_overview = Button(overview_gl_sub[1, :], label = "Overview", 
-                                fontsize = 16, 
-                                font =:italic, 
-                                halign = :left)
+    # btn_overview = Button(overview_gl[1, :], label = "Overview", 
+    #                             fontsize = 16, 
+    #                             font =:italic, 
+    #                             halign = :left)
     
-    cb_true = Checkbox(fig, checked = false)
-    
+    # overview_gl_sub[1, 1] = empty_layout
+    # # rowgap!(overview_gl_sub[1,1], 0)
+    overview_controls = GridLayout()
+    draw_overview_controls!(fig, overview_controls, CURVEDATA)
+    make_button_block!(overview_gl, overview_controls; 
+                    btn_label = "Overview", 
+                    btn_width = CURVEDATA[:sidebar_sub_width]/3,
+                    )
 
-
-
-    
-    tb_name = Textbox(fig, 
-             width = sidebar_sub_width,
-             placeholder = "Material Name",
-             boxcolor = :white)
-
-    overview_gl_sub[2,:] = vgrid!(
-                            hgrid!(cb_true, Label(fig, "True"), halign = :left),
-                            # Label(fig, "Material Name", halign = :left),
-                            tb_name,
-                        )
 
     ############### True Stress ########################################################################################
 
@@ -288,24 +295,24 @@ function main(data = nothing;
     
 
     ############## BOXES ###############################################################################################
-    for sidebar in (overview_gl_sub, true_stress_gl_sub, emod_gl_sub, hardening_gl_sub, export_gl_sub)
-        Box(sidebar[2,:], 
-            linestyle = :solid,
-            color = :grey90,
-            width = sidebar_width,
-            tellwidth = true,
-            tellheight = false,
-            alignmode = Outside(-10),
-            cornerradius = 10,
-            z = -100)
+    # for sidebar in (overview_gl_sub, true_stress_gl_sub, emod_gl_sub, hardening_gl_sub, export_gl_sub)
+    #     Box(sidebar[2,:], 
+    #         linestyle = :solid,
+    #         color = :grey90,
+    #         width = sidebar_width,
+    #         tellwidth = true,
+    #         tellheight = false,
+    #         alignmode = Outside(-10),
+    #         cornerradius = 10,
+    #         z = -100)
 
-    end
-    Box(gl_bot[1,1], 
-            linestyle = :solid,
-            height = bottom_panel_height,
-            color = :grey90,
-            tellwidth = false,
-            z = -100)
+    # end
+    # Box(gl_bot[1,1], 
+    #         linestyle = :solid,
+    #         height = bottom_panel_height,
+    #         color = :grey90,
+    #         tellwidth = false,
+    #         z = -100)
 
 
     # Box(export_gl[:, :],
@@ -314,13 +321,28 @@ function main(data = nothing;
     #             z = -100)
         
     ####################EVENTS########################################################################        
-    on(cb_true.checked) do val
-        SSE["is true"] = val
-        update_SSE!(SSE; alg)
-        update_stress_plot!(axss, SSE; N)
-        update_status_label!(label_status, SSE)
+    
+    # on(btn_overview.clicks) do _
+    #     CURVEDATA[:is_overview_block_visible][] = !CURVEDATA[:is_overview_block_visible][]
+    # end
+    # on(CURVEDATA[:is_overview_block_visible]) do visible
+    #     if visible
+    #         overview_gl_sub[1, 1] = overview_controls
+    #         overview_gl_sub_hidden[1, 1] = empty_layout
+    #         # rowgap!(overview_gl_sub, 1, 10)
+    #     else
+    #         overview_gl_sub[1, 1] = empty_layout
+    #         overview_gl_sub_hidden[1, 1] = overview_controls
+    #         # rowgap!(overview_gl_sub, 1, 0)
+    #     end
+    # end
+    # on(cb_true.checked) do val
+    #     SSE["is true"] = val
+    #     update_SSE!(SSE; alg)
+    #     update_stress_plot!(axss, SSE; N)
+    #     update_status_label!(label_status, SSE)
        
-    end
+    # end
 
     
     on(sld_modulus.value) do val
@@ -398,10 +420,10 @@ function main(data = nothing;
         update_status_label!(label_status, SSE)
     end
 
-    on(tb_name.stored_string) do s
-        SSE["name"] = s
-        update_stress_plot!(axss, SSE)
-    end
+    # on(tb_name.stored_string) do s
+    #     SSE["name"] = s
+    #     update_stress_plot!(axss, SSE)
+    # end
 
     on(btn_bspline_plus.clicks) do _
         nc = SSE["BSpline approximation knots"]
@@ -906,4 +928,94 @@ function export_data(SSE;
     @info  "Done"
 end
 
+function draw_overview_controls!(fig::Figure, Lay::GridLayout, D::Dict{Symbol, Any})
+    @assert hasallkeys(D, [:is_true_stress, :name, :sidebar_sub_width])
 
+    cb_true_stress = Checkbox(fig, checked = false)
+    
+    tb_name = Textbox(fig, 
+             width = D[:sidebar_sub_width],
+             placeholder = "Material Name",
+             boxcolor = :white)
+
+    Lay[1, 1] = vgrid!(
+                            hgrid!(cb_true_stress, Label(fig, "True"), halign = :left),
+                            # Label(fig, "Material Name", halign = :left),
+                            tb_name,
+                        )
+
+    ############### BEHAVIOR ###########################################################################################
+
+    on(cb_true_stress.checked) do val
+        D[:is_true_stress] = val
+        #recalc
+        #update plot
+        #update status
+    end
+
+    on(tb_name.stored_string) do s
+        D[:name] = s
+        #update plot title
+    end
+
+    ####################################################################################################################
+
+                        
+    return nothing
+
+end
+
+"""
+    make_button_block!(main_GL::GridLayout, controls::GridLayout; #holds the widget and behavior
+                        btn_label= "Show / Hide", #what to show on the button
+                        btn_width = 50, 
+                        is_visible = false,
+                        btn_kwargs...
+                        )
+
+Generates a block with toggleable visibility via a top button.
+"""
+function make_button_block!(main_GL::GridLayout, controls::GridLayout; #holds the widget and behavior
+                        btn_label= "Show / Hide", #what to show on the button
+                        btn_width = 50,
+                        is_visible = false,
+                        btn_halign = :left,
+                        btn_fontsize = 16,
+                        btn_font = :italic,
+                        ) #initial visibility
+
+    
+    btn_visible = Button(main_GL[1,1], label = btn_label, 
+                        width = btn_width, 
+                        halign = btn_halign,
+                        fontsize = btn_fontsize,
+                        font = btn_font)
+
+    visibility = Observable(is_visible)
+
+    sub_GL = main_GL[2, :] = GridLayout()
+
+    hidden_GL = GridLayout(bbox = (-100, -100, 0, 0)) #offscreen
+    empty_GL = GridLayout()
+    sub_GL[1,1] = controls
+    hidden_GL[1,1] = empty_GL
+    
+    on(btn_visible.clicks) do  _
+        #toggle visibility
+        visibility[] = !visibility[]
+    end
+
+    on(visibility) do visible
+        if visible
+            sub_GL[1,1] = controls
+            hidden_GL[1,1] = empty_GL
+            rowsize!(main_GL, 2, Auto(false))
+        else 
+            sub_GL[1,1] = empty_GL
+            hidden_GL[1,1] = controls
+            rowsize!(main_GL, 2, Fixed(0))
+        end
+    end
+    visibility[] = is_visible #trigger
+    return nothing
+end
