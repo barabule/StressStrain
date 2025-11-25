@@ -39,6 +39,7 @@ function main(data = nothing;
             :sidebar_width => sidebar_width,
             :sidebar_sub_width => sidebar_sub_width,
             :resample_menu_options => zip(resamplefunclabels, resamplefuncs),
+            :menu_hardening_fit_options => zip(fitfunclabels, fitfuncs),
             :max_elastic_range => 5e-3,
     )
 
@@ -118,128 +119,26 @@ function main(data = nothing;
                     btn_width = CURVEDATA[:sidebar_sub_width]/3)
 
 
-    # sldvals = get_slider_range_values(SSE)
     
-
-    # sld_modulus = Slider(fig, 
-    #                 range = LinRange(sldvals.vmin, sldvals.vmax, 1001),
-    #                 startvalue= sldvals.value,
-    #                 update_while_dragging =true,
-    #                 width = sidebar_sub_width,
-    #                 )
-
-    # max_elastic_range = SSE["max elastic range"]
-
-    # sld_elastic_range = Slider(fig,
-    #                 range = LinRange(0.0, max_elastic_range, 1000),
-    #                 startvalue = 1e-3,
-    #                 update_while_dragging = true,
-    #                 width = 0.4 * sidebar_sub_width,
-    #                 )
-
-    # lab_elastic_range_val = Label(fig, "0.001")
-
-    # lab_modulus = Label(fig, "E = ")
-
-    # tb_modulus = Textbox(fig, 
-    #                         placeholder = "$(round(sld_modulus.value[]; sigdigits= 3))MPa",
-    #                         validator = Float64,
-    #                         width = 0.4 * sidebar_sub_width,
-    #                         )
-
-
-    # sld_offset = Slider(fig,
-    #             range= LinRange(1e-3, 0.1, 100),
-    #             startvalue = 2e-3,
-    #             update_while_dragging = false,
-                
-    #             )
-
-    # cb_fixed = Checkbox(fig, checked = false)
-    
-    # lab_offset = Label(fig, "Offset = $(round(sld_offset.value[]; sigdigits = 3))")
-    
-
-    # emod_gl_sub[2,:] = vgrid!(
-    #     # Label(fig, "E Modulus", fontsize = 20, font =:italic),
-    #     hgrid!(lab_modulus, tb_modulus, Label(fig, "MPa")),
-    #     sld_modulus,
-    #     hgrid!(Label(fig, "Fix Modulus"), cb_fixed),
-    #     hgrid!(Label(fig, "Elastic range "), sld_elastic_range, lab_elastic_range_val),
-    #     hgrid!(lab_offset, sld_offset),
-    #     ;
-    #     width = sidebar_sub_width,
-    # )
-
     ################ Hardening #########################################################################################
 
-    btn_hardening_edit = Button(hardening_gl_sub[1, :], 
-                                label = "Hardening Curve", 
-                                fontsize = 16, 
-                                font =:italic,
-                                halign = :left,
-                                )
+    hardening_controls = GridLayout()
+    draw_hardening_controls!(fig, hardening_controls, CURVEDATA)
+    make_button_block!(hardening_gl, hardening_controls;
+                        btn_label = "Hardening",
+                        btn_width = CURVEDATA[:sidebar_sub_width]/3)
 
-    fit_menu = Menu(fig, options = zip(fitfunclabels, fitfuncs),
-                    default = "Linear",
-                    width = 0.6 * sidebar_sub_width)
-
-    tb_hardening_pts = Textbox(fig, placeholder = "Enter number",
-                        validator = Int,
-                        width = 0.5 * sidebar_sub_width,
-                        )
-
-    tb_extrapolation_strain = Textbox(fig, 
-                        validator = Float64,
-                        width = 50,
-                        halign=:left,
-                        boxcolor = :white,
-                        )
-
-    
-
-    hardening_gl_sub[2,:] = vgrid!(
-            # Label(fig, "Hardening Curve", fontsize = 20, font =:italic),
-            hgrid!(Label(fig, "Method"), fit_menu),
-            hgrid!(Label(fig, "Num Pts"), tb_hardening_pts),
-            hgrid!(Label(fig, "Extrapolate strain to"), tb_extrapolation_strain),
-            # (Label("True", alignmode = :right), Checkbox(checked = false)),
-            ;
-            halign = :left,
-            tellheight = false, 
-            width = sidebar_sub_width,
-    )    
 
 
     ################### Export Panel ###################################################################################
 
-    btn_export_edit = Button(export_gl_sub[1, :], 
-                        label = "Export",
-                        fontsize = 16, 
-                        font =:italic,
-                        halign = :left,
-                        )
-
-    btn_export = Button(fig, label = "Export")
-
-    cb_exp_true = Checkbox(fig, checked = true)
-    cb_exp_hardening = Checkbox(fig, checked = true)
-    cb_exp_plot = Checkbox(fig, checked = true)
+    export_controls = GridLayout()
+    draw_export_controls!(fig, export_controls, CURVEDATA)
+    make_button_block!(export_gl, export_controls;
+                btn_label = "Export",
+                btn_width =CURVEDATA[:sidebar_sub_width]/3)
 
     
-    # export_gl_sub[2,:] = vgrid!(
-    #                 hgrid!(vgrid!(vgrid!(cb_exp_true, cb_exp_hardening, cb_exp_plot),
-    #                        Label(fig, "True Stress"), Label(fig, "Hardening"), Label(fig, "Plot")),
-    #                       ),
-    #                 btn_export,
-    #                             )
-    
-    export_gl_sub[2, :] = vgrid!(
-                            hgrid!(cb_exp_true, Label(fig, "True Stress"), halign = :left),
-                            hgrid!(cb_exp_hardening, Label(fig, "Hardening"),halign = :left),
-                            hgrid!(cb_exp_plot, Label(fig, "Plot"),halign = :left),
-                            btn_export,
-                            )
 
 
     ################## Bottom Panel ####################################################################################
@@ -289,43 +188,8 @@ function main(data = nothing;
     #             z = -100)
         
     ####################EVENTS########################################################################        
+   
     
-    # on(btn_overview.clicks) do _
-    #     CURVEDATA[:is_overview_block_visible][] = !CURVEDATA[:is_overview_block_visible][]
-    # end
-    # on(CURVEDATA[:is_overview_block_visible]) do visible
-    #     if visible
-    #         overview_gl_sub[1, 1] = overview_controls
-    #         overview_gl_sub_hidden[1, 1] = empty_layout
-    #         # rowgap!(overview_gl_sub, 1, 10)
-    #     else
-    #         overview_gl_sub[1, 1] = empty_layout
-    #         overview_gl_sub_hidden[1, 1] = overview_controls
-    #         # rowgap!(overview_gl_sub, 1, 0)
-    #     end
-    # end
-    # on(cb_true.checked) do val
-    #     SSE["is true"] = val
-    #     update_SSE!(SSE; alg)
-    #     update_stress_plot!(axss, SSE; N)
-    #     update_status_label!(label_status, SSE)
-       
-    # end
-
-    
-    
-
-    
-
-    
-
-    on(fit_menu.selection) do s
-        
-        SSE["interpolant"] = s
-        update_SSE!(SSE; alg, recompute_modulus = false) #don't recalc modulus
-        update_status_label!(label_status, SSE)
-        update_stress_plot!(axss, SSE; N)
-    end
 
 
 
@@ -342,13 +206,7 @@ function main(data = nothing;
         update_stress_plot!(axss, SSE)
     end
 
-    on(tb_extrapolation_strain.stored_string) do s
-        
-        SSE["export max strain"] = clamp(parse(Float64, s), last(SSE["hardening"].strain), Inf)
-        update_stress_plot!(axss, SSE; N)
-        update_status_label!(label_status, SSE)
-        update_status_label!(label_status, SSE)
-    end
+    
 
     # on(tb_name.stored_string) do s
     #     SSE["name"] = s
@@ -358,22 +216,10 @@ function main(data = nothing;
     
 
 
-    on(tb_hardening_pts.stored_string) do s
-        num_hardening_pts = Int(clamp(parse(Int, s), 2, Inf))
-        SSE["export density"] = num_hardening_pts
-        update_SSE!(SSE;alg)
-        update_stress_plot!(axss, SSE; N = num_hardening_pts)
-    end
+    
 
 
-    on(btn_export.clicks) do _
-        export_data(SSE; export_true = cb_exp_true.checked[],
-                        export_hardening = cb_exp_hardening.checked[],
-                        export_plot = cb_exp_plot.checked[],
-                        # plot_export_format = menu_export_format.selection,
-                        )
-
-    end
+    
 
     on(sld_int.interval) do intv
         lo, hi = intv
@@ -942,7 +788,7 @@ end
 
 
 
-function draw_emodulus_controls!(fig, Lay::GridLayout, D::Dict{Symbol, Any})
+function draw_emodulus_controls!(fig::Figure, Lay::GridLayout, D::Dict{Symbol, Any})
 
     @assert hasallkeys(D, [:max_elastic_range, :sidebar_sub_width])
 
@@ -1027,15 +873,109 @@ function draw_emodulus_controls!(fig, Lay::GridLayout, D::Dict{Symbol, Any})
 
     
     on(cb_fixed.checked) do val
-        SSE["fixed modulus"] = val
+        # SSE["fixed modulus"] = val
     end
 
     on(sld_offset.value) do val
-        SSE["hardening offset"] = val
-        update_SSE!(SSE;recompute_modulus =false)
-        update_stress_plot!(axss, SSE; N)
-        lab_offset.text = "Offset = $(round(sld_offset.value[]; sigdigits = 3))"
+        # SSE["hardening offset"] = val
+        # update_SSE!(SSE;recompute_modulus =false)
+        # update_stress_plot!(axss, SSE; N)
+        # lab_offset.text = "Offset = $(round(sld_offset.value[]; sigdigits = 3))"
     end
+
+end
+
+
+function draw_hardening_controls!(fig::Figure, Lay::GridLayout, D::Dict{Symbol, Any})
+
+    @assert hasallkeys(D, [:sidebar_sub_width, :menu_hardening_fit_options])
+
+    fit_menu = Menu(fig, options = D[:menu_hardening_fit_options],
+                    default = "Linear",
+                    width = 0.6 * D[:sidebar_sub_width])
+
+    tb_hardening_pts = Textbox(fig, placeholder = "Enter number",
+                        validator = Int,
+                        width = 0.5 * D[:sidebar_sub_width],
+                        )
+
+    tb_extrapolation_strain = Textbox(fig, 
+                        validator = Float64,
+                        width = 50,
+                        halign=:left,
+                        boxcolor = :white,
+                        )
+
+    
+
+    Lay[1, 1] = vgrid!(
+            # Label(fig, "Hardening Curve", fontsize = 20, font =:italic),
+            hgrid!(Label(fig, "Method"), fit_menu),
+            hgrid!(Label(fig, "Num Pts"), tb_hardening_pts),
+            hgrid!(Label(fig, "Extrapolate strain to"), tb_extrapolation_strain),
+            # (Label("True", alignmode = :right), Checkbox(checked = false)),
+            ;
+            halign = :left,
+            tellheight = false, 
+            width = D[:sidebar_sub_width],
+    )    
+    ########### BEHAVIOR #############
+    on(fit_menu.selection) do s
+        
+        # SSE["interpolant"] = s
+        # update_SSE!(SSE; alg, recompute_modulus = false) #don't recalc modulus
+        # update_status_label!(label_status, SSE)
+        # update_stress_plot!(axss, SSE; N)
+    end
+
+    on(tb_extrapolation_strain.stored_string) do s
+        
+        # SSE["export max strain"] = clamp(parse(Float64, s), last(SSE["hardening"].strain), Inf)
+        # update_stress_plot!(axss, SSE; N)
+        # update_status_label!(label_status, SSE)
+        # update_status_label!(label_status, SSE)
+    end
+
+    on(tb_hardening_pts.stored_string) do s
+        # num_hardening_pts = Int(clamp(parse(Int, s), 2, Inf))
+        # SSE["export density"] = num_hardening_pts
+        # update_SSE!(SSE;alg)
+        # update_stress_plot!(axss, SSE; N = num_hardening_pts)
+    end
+
+
+end
+
+
+function draw_export_controls!(fig::Figure, Lay::GridLayout, D::Dict{Symbol, Any})
+
+    @assert hasallkeys(D, [:sidebar_sub_width])
+
+    btn_export = Button(fig, label = "Export")
+
+    cb_exp_true = Checkbox(fig, checked = true)
+    cb_exp_hardening = Checkbox(fig, checked = true)
+    cb_exp_plot = Checkbox(fig, checked = true)
+
+    Lay[1,1] = vgrid!(
+                    hgrid!(cb_exp_true, Label(fig, "True Stress"), halign = :left),
+                    hgrid!(cb_exp_hardening, Label(fig, "Hardening"),halign = :left),
+                    hgrid!(cb_exp_plot, Label(fig, "Plot"), halign = :left),
+                    btn_export,
+                    )
+
+    ########## BEHAVIOR #################
+
+    on(btn_export.clicks) do _
+        # export_data(SSE; export_true = cb_exp_true.checked[],
+        #                 export_hardening = cb_exp_hardening.checked[],
+        #                 export_plot = cb_exp_plot.checked[],
+        #                 # plot_export_format = menu_export_format.selection,
+        #                 )
+
+    end
+
+
 
 end
 
