@@ -27,6 +27,9 @@ function main(data = nothing;
     
     sidebar_sub_width = subscale * sidebar_width
     bottom_panel_sub_height = subscale * bottom_panel_height
+
+    SSE, fitfuncs, fitfunclabels, resamplefuncs, resamplefunclabels = initialize(data; resample_density)
+    
     
     #holds the state
     CURVEDATA = Dict{Symbol, Any}(
@@ -35,6 +38,7 @@ function main(data = nothing;
             :is_overview_block_visible => Observable(false), 
             :sidebar_width => sidebar_width,
             :sidebar_sub_width => sidebar_sub_width,
+            :resample_menu_options => zip(resamplefunclabels, resamplefuncs),
     )
 
 
@@ -44,7 +48,7 @@ function main(data = nothing;
 
     
 
-    SSE, fitfuncs, fitfunclabels, resamplefuncs, resamplefunclabels = initialize(data; resample_density)
+    
 
     axss = initialize_axis(fig)
 
@@ -64,13 +68,11 @@ function main(data = nothing;
 
 
     #Gl to hold the controls
-    overview_gl_sub    = GridLayout(overview_gl[2,1], width = sidebar_sub_width, alignmode = Outside(10))
+    
     true_stress_gl_sub = GridLayout(true_stress_gl[1,1], width = sidebar_sub_width, alignmode = Outside(10))
     emod_gl_sub        = GridLayout(emod_gl[1,1], width = sidebar_sub_width, alignmode = Outside(10))
     hardening_gl_sub   = GridLayout(hardening_gl[1,1], width = sidebar_sub_width, alignmode = Outside(10))
-    #GL to hold the hidden controls
-    empty_layout = GridLayout()
-    overview_gl_sub_hidden = GridLayout(bbox = (0, 0, -100, -100)) #hidden gl for overview controls
+    
 
 
     gl_bot = GridLayout(fig[2, 1], height = bottom_panel_height, tellwidth = false)
@@ -87,14 +89,7 @@ function main(data = nothing;
 
     ############## Overview ############################################################################################
 
-    # Label(overview_gl_sub[1, :], "Overview", fontsize = 20, font =:italic)
-    # btn_overview = Button(overview_gl[1, :], label = "Overview", 
-    #                             fontsize = 16, 
-    #                             font =:italic, 
-    #                             halign = :left)
     
-    # overview_gl_sub[1, 1] = empty_layout
-    # # rowgap!(overview_gl_sub[1,1], 0)
     overview_controls = GridLayout()
     draw_overview_controls!(fig, overview_controls, CURVEDATA)
     make_button_block!(overview_gl, overview_controls; 
@@ -105,40 +100,12 @@ function main(data = nothing;
 
     ############### True Stress ########################################################################################
 
-    btn_true_stress_fig = Button(true_stress_gl_sub[1,:], label = "True Stress Curve", 
-                                fontsize = 16, 
-                                font =:italic,
-                                halign = :left,
-                                )
+    true_stress_controls = GridLayout()
+    draw_true_stress_controls!(fig, true_stress_controls, CURVEDATA)
+    make_button_block!(true_stress_gl, true_stress_controls;
+                            btn_label = "True Stress",
+                            btn_width = CURVEDATA[:sidebar_sub_width]/3)
 
-    resample_menu = Menu(fig, options = zip(resamplefunclabels, resamplefuncs),
-                                default = "Linear", width = sidebar_sub_width * 0.5)
-
-    tb_resample = Textbox(fig, placeholder = "Enter number",
-                    validator = Int, tellwidth = false,
-                    boxcolor = :white)
-
-    btn_manual = Button(fig, label = "Manual")
-    bezier_result_ref = Ref(Dict{String, Any}("status" => -1)) # holds the resampling result for bezier
-
-    
-    btn_reset = Button(fig, label = "Reset!")
-
-    btn_bspline_plus = Button(fig, label="+")
-    btn_bspline_minus = Button(fig, label = "-")
-    lab_bspline_control_pts = Label(fig, "4")
-
-    
-    true_stress_gl_sub[2,:] = vgrid!(
-                    Label(fig, "Resample Function", width = nothing),
-                    hgrid!(resample_menu, btn_bspline_plus, lab_bspline_control_pts, btn_bspline_minus),
-                    hgrid!(Label(fig, "Resample"), tb_resample),
-                    hgrid!(btn_manual, btn_reset),
-                    ;
-                    tellheight = false, 
-                    width = sidebar_sub_width,
-
-    )
 
     ############## Emod ################################################################################################
     
@@ -392,14 +359,7 @@ function main(data = nothing;
 
 
 
-    on(resample_menu.selection) do s
-        #TODO better handling of modulus update when fitting on true stress
-        SSE["resampler"] = s
-        # @info "SSE", SSE["resampler"]
-        update_SSE!(SSE;resample = true, recompute_modulus = false)
-        update_stress_plot!(axss, SSE; N)
-        update_status_label!(label_status, SSE)
-    end
+    
 
     
     on(events(fig).dropped_files) do files
@@ -425,71 +385,7 @@ function main(data = nothing;
     #     update_stress_plot!(axss, SSE)
     # end
 
-    on(btn_bspline_plus.clicks) do _
-        nc = SSE["BSpline approximation knots"]
-        nc += 1
-        SSE["BSpline approximation knots"] = nc
-        lab_bspline_control_pts.text = string(nc)
-        update_SSE!(SSE)
-        update_stress_plot!(axss, SSE)
-        update_status_label!(label_status, SSE)
-    end
-
-    on(btn_bspline_minus.clicks) do _ 
-        nc = SSE["BSpline approximation knots"]
-        nc = max(4, nc - 1)
-        SSE["BSpline approximation knots"] = nc
-        lab_bspline_control_pts.text = string(nc)
-        update_SSE!(SSE)
-        update_stress_plot!(axss, SSE)
-        update_status_label!(label_status, SSE)
-    end
-
-
-
-    on(tb_resample.stored_string) do s
-        SSE["resample density"] = clamp(parse(Int, s), 2, 10_000)
-        update_SSE!(SSE;alg, resample = true, recompute_modulus = false)
-        update_stress_plot!(axss, SSE; N)
-        update_status_label!(label_status, SSE)
-    end
-
-
-    on(btn_manual.clicks) do _
-        #open a new window, do the fitting,
-        #then close the main window and restart with new data
-        # handle_bezier_fit(SSE, screen)
-        @async begin
-            @info "Opening Bezier Fitting Window"
-            bezier_result_ref[]["status"] = 0 #reset the status
-            bezier_result_ref[]["data"] = SSE["rawdata"]
-            CubicPiecewiseBezier.bezier_fit_fig(bezier_result_ref)
-            
-            @info "Closed Bezier Fitting Window"
-            
-            
-            results = bezier_result_ref[] #get the last state
-            # @info "Status", results["status"]
-            bezier_fit = results["bezier fit"]
-            #no longer necessary, this returns directly what we need
-            # strain = [pt[1] for pt in bezier_fit]
-            # stress = [pt[2] for pt in bezier_fit]
-            if !haskey(SSE, "original data")#backup
-                push!(SSE, "original data" => SSE["rawdata"])
-            end
-            SSE["rawdata"] = bezier_fit
-            update_SSE!(SSE)
-            update_stress_plot!(axss, SSE; N)
-            update_status_label!(label_status, SSE)
-
-        end
-         
-    end
-
-    on(btn_reset.clicks) do _
-        reset_SSE!(SSE)
-        update_stress_plot!(axss, SSE; N)
-    end
+    
 
 
     on(tb_hardening_pts.stored_string) do s
@@ -963,6 +859,115 @@ function draw_overview_controls!(fig::Figure, Lay::GridLayout, D::Dict{Symbol, A
                         
     return nothing
 
+end
+
+
+function draw_true_stress_controls!(fig::Figure, Lay::GridLayout, D::Dict{Symbol, Any})
+
+    @assert hasallkeys(D, [:resample_menu_options, :sidebar_sub_width])
+
+    resample_menu = Menu(fig, options = D[:resample_menu_options],
+                                default = "Linear", width = D[:sidebar_sub_width] * 0.5)
+
+    tb_resample = Textbox(fig, placeholder = "Enter number",
+                    validator = Int, tellwidth = false,
+                    boxcolor = :white)
+
+    btn_manual = Button(fig, label = "Manual")
+    bezier_result_ref = Ref(Dict{String, Any}("status" => -1)) # holds the resampling result for bezier
+
+    
+    btn_reset = Button(fig, label = "Reset!")
+
+    btn_bspline_plus = Button(fig, label="+")
+    btn_bspline_minus = Button(fig, label = "-")
+    lab_bspline_control_pts = Label(fig, "4")
+
+    
+    Lay[1,1] = vgrid!(
+                    Label(fig, "Resample Function", width = nothing),
+                    hgrid!(resample_menu, btn_bspline_plus, lab_bspline_control_pts, btn_bspline_minus),
+                    hgrid!(Label(fig, "Resample"), tb_resample),
+                    hgrid!(btn_manual, btn_reset),
+                    ;
+                    tellheight = false, 
+                    width = D[:sidebar_sub_width],
+
+    )
+
+    ###### BEHAVIOR #######
+    on(resample_menu.selection) do s
+        # #TODO better handling of modulus update when fitting on true stress
+        # SSE["resampler"] = s
+        # # @info "SSE", SSE["resampler"]
+        # update_SSE!(SSE;resample = true, recompute_modulus = false)
+        # update_stress_plot!(axss, SSE; N)
+        # update_status_label!(label_status, SSE)
+    end
+    on(btn_bspline_plus.clicks) do _
+        # nc = SSE["BSpline approximation knots"]
+        # nc += 1
+        # SSE["BSpline approximation knots"] = nc
+        # lab_bspline_control_pts.text = string(nc)
+        # update_SSE!(SSE)
+        # update_stress_plot!(axss, SSE)
+        # update_status_label!(label_status, SSE)
+    end
+
+    on(btn_bspline_minus.clicks) do _ 
+        # nc = SSE["BSpline approximation knots"]
+        # nc = max(4, nc - 1)
+        # SSE["BSpline approximation knots"] = nc
+        # lab_bspline_control_pts.text = string(nc)
+        # update_SSE!(SSE)
+        # update_stress_plot!(axss, SSE)
+        # update_status_label!(label_status, SSE)
+    end
+
+    on(tb_resample.stored_string) do s
+        # SSE["resample density"] = clamp(parse(Int, s), 2, 10_000)
+        # update_SSE!(SSE;alg, resample = true, recompute_modulus = false)
+        # update_stress_plot!(axss, SSE; N)
+        # update_status_label!(label_status, SSE)
+    end
+
+    on(btn_manual.clicks) do _
+        # #open a new window, do the fitting,
+        # #then close the main window and restart with new data
+        # # handle_bezier_fit(SSE, screen)
+        # @async begin
+        #     @info "Opening Bezier Fitting Window"
+        #     bezier_result_ref[]["status"] = 0 #reset the status
+        #     bezier_result_ref[]["data"] = SSE["rawdata"]
+        #     CubicPiecewiseBezier.bezier_fit_fig(bezier_result_ref)
+            
+        #     @info "Closed Bezier Fitting Window"
+            
+            
+        #     results = bezier_result_ref[] #get the last state
+        #     # @info "Status", results["status"]
+        #     bezier_fit = results["bezier fit"]
+        #     #no longer necessary, this returns directly what we need
+        #     # strain = [pt[1] for pt in bezier_fit]
+        #     # stress = [pt[2] for pt in bezier_fit]
+        #     if !haskey(SSE, "original data")#backup
+        #         push!(SSE, "original data" => SSE["rawdata"])
+        #     end
+        #     SSE["rawdata"] = bezier_fit
+        #     update_SSE!(SSE)
+        #     update_stress_plot!(axss, SSE; N)
+        #     update_status_label!(label_status, SSE)
+
+        # end
+         
+    end
+
+    on(btn_reset.clicks) do _
+        # reset_SSE!(SSE)
+        # update_stress_plot!(axss, SSE; N)
+    end
+
+    return nothing
 end
 
 """
