@@ -10,7 +10,7 @@ function main(data = nothing;
                 resample_density = 20,
                 )
 
-
+    #the default 'data'
     if isnothing(data)
         ___strain___ = collect(LinRange(0, 0.1, 100))
         data = (;strain = ___strain___,
@@ -18,15 +18,19 @@ function main(data = nothing;
                 )
     end
 
+    if clean_data
+            clean!(data)
+    end
+
+
+    #########################GLOBALS####################################################################################
 
     fig = Figure(title = "Elasto Plastic Fitter")
     
     sidebar_sub_width = subscale * sidebar_width
     bottom_panel_sub_height = subscale * bottom_panel_height
 
-    if clean_data
-        clean!(data)
-    end
+    
 
     SSE, fitfuncs, fitfunclabels, resamplefuncs, resamplefunclabels = initialize(data; resample_density)
 
@@ -35,7 +39,8 @@ function main(data = nothing;
 
     update_stress_plot!(axss, SSE; N)
     
-    
+    # xlims!(axss, low = 0)
+    ylims!(axss, low = 0) #don't care about negative crap
     
     sidebar = GridLayout(fig[1,2], width = sidebar_width, tellheight = false) #holds most controls
 
@@ -61,25 +66,43 @@ function main(data = nothing;
     # export_gl = GridLayout(fig[2,2])
     export_gl = GridLayout(sidebar[5,1])
     export_gl_sub = GridLayout(export_gl[1, 1], 
-                        tellheight = false, tellwidth = false, 
+                        width = sidebar_sub_width,
+                        # tellheight = false, tellwidth = false, 
                         alignmode = Outside(10))
 
 
-    ############## Overview
+    ############## Overview ############################################################################################
 
-    Label(overview_gl_sub[1, :], "Overview", fontsize = 20, font =:italic)
-    cb_true = Checkbox(overview_gl_sub[2,2], checked = false)
-    Label(overview_gl_sub[2,1], "True", halign = :left)
+    # Label(overview_gl_sub[1, :], "Overview", fontsize = 20, font =:italic)
+    btn_overview = Button(overview_gl_sub[1, :], label = "Overview", 
+                                fontsize = 16, 
+                                font =:italic, 
+                                halign = :left)
+    
+    cb_true = Checkbox(fig, checked = false)
+    
 
 
 
-    Label(overview_gl_sub[3,:], "Material Name")
-    tb_name = Textbox(overview_gl_sub[4,:], 
+    
+    tb_name = Textbox(fig, 
              width = sidebar_sub_width,
-             placeholder = "Enter material name",
+             placeholder = "Material Name",
              boxcolor = :white)
 
-    ############### True Stress
+    overview_gl_sub[2,:] = vgrid!(
+                            hgrid!(cb_true, Label(fig, "True"), halign = :left),
+                            # Label(fig, "Material Name", halign = :left),
+                            tb_name,
+                        )
+
+    ############### True Stress ########################################################################################
+
+    btn_true_stress_fig = Button(true_stress_gl_sub[1,:], label = "True Stress Curve", 
+                                fontsize = 16, 
+                                font =:italic,
+                                halign = :left,
+                                )
 
     resample_menu = Menu(fig, options = zip(resamplefunclabels, resamplefuncs),
                                 default = "Linear", width = sidebar_sub_width * 0.5)
@@ -99,20 +122,27 @@ function main(data = nothing;
     lab_bspline_control_pts = Label(fig, "4")
 
     
-    true_stress_gl_sub[1,1] = vgrid!(
-                    Label(fig, "True Stress Curve", fontsize = 20, font =:italic),
+    true_stress_gl_sub[2,:] = vgrid!(
                     Label(fig, "Resample Function", width = nothing),
                     hgrid!(resample_menu, btn_bspline_plus, lab_bspline_control_pts, btn_bspline_minus),
                     hgrid!(Label(fig, "Resample"), tb_resample),
                     hgrid!(btn_manual, btn_reset),
-    ;
+                    ;
                     tellheight = false, 
                     width = sidebar_sub_width,
 
     )
 
-    ############## Emod
+    ############## Emod ################################################################################################
     
+
+    btn_emodulus_edit = Button(emod_gl_sub[1,:], 
+                            label = "E Modulus", 
+                            fontsize = 16, 
+                            font =:italic, 
+                            halign = :left,
+                            )
+
     sldvals = get_slider_range_values(SSE)
     
 
@@ -155,8 +185,8 @@ function main(data = nothing;
     lab_offset = Label(fig, "Offset = $(round(sld_offset.value[]; sigdigits = 3))")
     
 
-    emod_gl_sub[1,1] = vgrid!(
-        Label(fig, "E Modulus", fontsize = 20, font =:italic),
+    emod_gl_sub[2,:] = vgrid!(
+        # Label(fig, "E Modulus", fontsize = 20, font =:italic),
         hgrid!(lab_modulus, tb_modulus, Label(fig, "MPa")),
         sld_modulus,
         hgrid!(Label(fig, "Fix Modulus"), cb_fixed),
@@ -166,7 +196,15 @@ function main(data = nothing;
         width = sidebar_sub_width,
     )
 
-    ################ Hardening
+    ################ Hardening #########################################################################################
+
+    btn_hardening_edit = Button(hardening_gl_sub[1, :], 
+                                label = "Hardening Curve", 
+                                fontsize = 16, 
+                                font =:italic,
+                                halign = :left,
+                                )
+
     fit_menu = Menu(fig, options = zip(fitfunclabels, fitfuncs),
                     default = "Linear",
                     width = 0.6 * sidebar_sub_width)
@@ -185,20 +223,51 @@ function main(data = nothing;
 
     
 
-    hardening_gl_sub[1,1] = vgrid!(
-            Label(fig, "Hardening Curve", fontsize = 20, font =:italic),
+    hardening_gl_sub[2,:] = vgrid!(
+            # Label(fig, "Hardening Curve", fontsize = 20, font =:italic),
             hgrid!(Label(fig, "Method"), fit_menu),
             hgrid!(Label(fig, "Num Pts"), tb_hardening_pts),
             hgrid!(Label(fig, "Extrapolate strain to"), tb_extrapolation_strain),
             # (Label("True", alignmode = :right), Checkbox(checked = false)),
             ;
+            halign = :left,
             tellheight = false, 
             width = sidebar_sub_width,
     )    
 
 
+    ################### Export Panel ###################################################################################
+
+    btn_export_edit = Button(export_gl_sub[1, :], 
+                        label = "Export",
+                        fontsize = 16, 
+                        font =:italic,
+                        halign = :left,
+                        )
+
+    btn_export = Button(fig, label = "Export")
+
+    cb_exp_true = Checkbox(fig, checked = true)
+    cb_exp_hardening = Checkbox(fig, checked = true)
+    cb_exp_plot = Checkbox(fig, checked = true)
+
     
-    ################## Bottom Panel    
+    # export_gl_sub[2,:] = vgrid!(
+    #                 hgrid!(vgrid!(vgrid!(cb_exp_true, cb_exp_hardening, cb_exp_plot),
+    #                        Label(fig, "True Stress"), Label(fig, "Hardening"), Label(fig, "Plot")),
+    #                       ),
+    #                 btn_export,
+    #                             )
+    
+    export_gl_sub[2, :] = vgrid!(
+                            hgrid!(cb_exp_true, Label(fig, "True Stress"), halign = :left),
+                            hgrid!(cb_exp_hardening, Label(fig, "Hardening"),halign = :left),
+                            hgrid!(cb_exp_plot, Label(fig, "Plot"),halign = :left),
+                            btn_export,
+                            )
+
+
+    ################## Bottom Panel ####################################################################################
 
     sld_int = IntervalSlider(gl_bot_sub[1,2], range = LinRange(0, last(SSE["true stress"].strain), 1000),
                     startvalues = (0.0, last(SSE["true stress"].strain)))
@@ -216,36 +285,18 @@ function main(data = nothing;
 
     label_status = Label(gl_bot_sub[2,:], "Status", tellwidth = false)
 
-    ################### Export Panel
+    
 
-
-
-    btn_export = Button(fig, label = "Export")
-
-    cb_exp_true = Checkbox(fig, checked = true)
-    cb_exp_hardening = Checkbox(fig, checked = true)
-    cb_exp_plot = Checkbox(fig, checked = true)
-
-    # menu_export_format = Menu(fig, 
-    #                             options = zip(("PNG", "SVG"), (:png, :svg)),
-    #                             default = "PNG",
-    #                             )
-
-    export_gl_sub[1,1] = vgrid!(
-        Label(fig, "Export", font=:italic, fontsize =20),
-        # menu_export_format,
-        hgrid!(vgrid!(Label(fig, "True Stress"), Label(fig, "Hardening"), Label(fig, "Plot")),
-               vgrid!(cb_exp_true, cb_exp_hardening, cb_exp_plot)),
-        btn_export,
-    )
-
-    #draw the damn boxes
-    for sidebar in (overview_gl, true_stress_gl, emod_gl, hardening_gl)
-        Box(sidebar[1,1], 
+    ############## BOXES ###############################################################################################
+    for sidebar in (overview_gl_sub, true_stress_gl_sub, emod_gl_sub, hardening_gl_sub, export_gl_sub)
+        Box(sidebar[2,:], 
             linestyle = :solid,
             color = :grey90,
             width = sidebar_width,
             tellwidth = true,
+            tellheight = false,
+            alignmode = Outside(-10),
+            cornerradius = 10,
             z = -100)
 
     end
@@ -257,10 +308,10 @@ function main(data = nothing;
             z = -100)
 
 
-    Box(export_gl[1, 1],
-                linestyle = :solid,
-                color = :grey90,
-                z = -100)
+    # Box(export_gl[:, :],
+    #             linestyle = :solid,
+    #             color = :grey90,
+    #             z = -100)
         
     ####################EVENTS########################################################################        
     on(cb_true.checked) do val
