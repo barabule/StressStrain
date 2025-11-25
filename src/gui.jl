@@ -7,7 +7,6 @@ function main(data = nothing;
                 bottom_panel_height = 100,
                 subscale = 0.9,
                 alg = NelderMead(),
-                resample_density = 20,
                 )
 
     #the default 'data'
@@ -28,13 +27,11 @@ function main(data = nothing;
     sidebar_sub_width = subscale * sidebar_width
     bottom_panel_sub_height = subscale * bottom_panel_height
 
-    export_folder, fitfuncs, fitfunclabels, resamplefuncs, resamplefunclabels = initialize(data; resample_density)
+    export_folder, fitfuncs, fitfunclabels, resamplefuncs, resamplefunclabels = initialize(data)
     
     fig = Figure(title = "Elasto Plastic Fitter")
     
-    axss = Axis(fig[1,1], title = "Stress Strain",
-                    xlabel = "True Strain [-]",
-                    ylabel = "True Stress [MPa]")
+    axss = initialize_axis(fig)
 
 
     #holds the state
@@ -68,13 +65,15 @@ function main(data = nothing;
             #recomputable
             :base_data => deepcopy(data), #this is the basis for all the computations - can be changed by resampling
             :resample_base_data => false, #resample base_data with resampler function
-            :recompute_modulus => true,
+            # these control the computation
+            :recompute_modulus => true, 
             :recompute_true_stress => true, 
             :recompute_hardening_portion => true,
             :recompute_hardening_fit => true,
+            #to be computed
             :true_stress =>(;strain = [], stress = []), #modified from base_data
             :hardening_portion =>(;strain = [], stress = []),#modified from true_stress
-            :hardening_fitter => nothing, #actual interpolant after fit
+            :hardening_fitter => nothing, #fitted hardening function, points are not stored
             # export settings
             :export_density => 100, # how many pts to export
             :export_true_stress => true,
@@ -231,7 +230,7 @@ function update_stress_plot(D::Dict{Symbol, Any})
 
     ax.title = D[:name]
 
-    if D[:plot_rawdata]
+    if D[:plot_rawdata] #show very faintly
         RD = D[:rawdata]
         scatter!(ax, RD.strain, RD.stress, 
                 color = (:grey90, 0.7),
@@ -246,7 +245,8 @@ function update_stress_plot(D::Dict{Symbol, Any})
             scatterlines!(ax, BD.strain, BD.stress, 
                             color = (:grey10, 0.5), 
                             marker = 'o', 
-                            markersize = 10, 
+                            markersize = 10,
+                            markercolor = :grey10, 
                             label = "Raw Data (Engineering)")
         end
         tss = D[:true_stress]
@@ -263,7 +263,7 @@ function update_stress_plot(D::Dict{Symbol, Any})
                 )
     end
 
-    if D[:plot_hardening_fit]
+    if D[:plot_hardening_fit] #on demand
         hss = D[:hardening_fitter]
         epi = LinRange(0, D[:max_plastic_strain], D[:plot_density])
         ssi = hss.(epi)
@@ -283,7 +283,7 @@ function update_stress_plot(D::Dict{Symbol, Any})
         slin = E .* tlin
         lines!(ax, tlin, slin, linestyle = :dash, color = :red)
 
-        if D[:plot_hardening_offset]#hardening offset
+        if D[:plot_hardening_offset]
             lines!(ax, tlin .+ D[:hardening_offset], slin, color = (:red, 0.3), linestyle = :solid )
         end
     end
@@ -305,10 +305,7 @@ end
 
 
 
-function initialize(data;
-                    alg = NelderMead(), 
-                    resample_density = 20,
-                    )
+function initialize(data)
 
     @assert hasallkeys(data, [:strain, :stress])
 
@@ -459,17 +456,6 @@ end
 
 
 
-# function change_true_status!(val::Bool, SSE)
-
-#     SSE["is_true"] = val
-#     update_SSE!(SSE)
-#     return !val
-# end
-
-
-
-
-
 function get_slider_range_values(E, TT; sigdigits = 2)
     
     Ebracket = bracket_modulus(TT)
@@ -493,8 +479,11 @@ function update_modulus_slider!(D::Dict{Symbol, Any})
 end
 
 
-function update_status_label!(D::Dict{Symbol, Any})
-    label = D[:status_label]
+function update_status_label!(D::Dict{Symbol, Any}, 
+                label = nothing::Union{Nothing, String}, #can be overriden temporary
+                            )
+
+    label = isnothing(label) ? D[:status_label] : label
     text = interpolant_label(D[:hardening_fitter], D[:hardening_interpolant])
     # println(text)
     E = "E = $(D[:e_modulus]) MPa, "
@@ -981,4 +970,10 @@ function make_button_block!(main_GL::GridLayout, controls::GridLayout; #holds th
     end
     visibility[] = is_visible #trigger
     return nothing
+end
+
+function initialize_axis(fig)
+return Axis(fig[1,1], title = "Stress Strain",
+                    xlabel = "True Strain [-]",
+                    ylabel = "True Stress [MPa]")
 end
