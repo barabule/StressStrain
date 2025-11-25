@@ -51,8 +51,8 @@ function data_gui(parent_screen::GLMakie.Screen , #GLFW screen to be able to clo
     
     ####################################################################################################################
     
-    slider_strain_col = Slider(fig, range = 1:Imported[:num_cols], startvalue = 1)
-    slider_stress_col = Slider(fig, range = 1:Imported[:num_cols], startvalue = 2)
+    slider_strain_col = Slider(fig, range = 1:Imported[:num_cols], startvalue = 1, width = 60)
+    slider_stress_col = Slider(fig, range = 1:Imported[:num_cols], startvalue = 2, width = 60)
 
     tb_strain_mult = Textbox(fig, 
                         validator = Float64,
@@ -69,9 +69,12 @@ function data_gui(parent_screen::GLMakie.Screen , #GLFW screen to be able to clo
     btn_done   = Button(fig, label = "Done!")
     btn_clean = Button(fig, label = "Clean!")
 
+    lab_strain_col = Label(fig, "Strain column: 1")
+    lab_stress_col = Label(fig, "Stress column: 2")
+
     control_gl[1,1] = vgrid!(
-            hgrid!(Label(fig, "Strain column:"), slider_strain_col),
-            hgrid!(Label(fig, "Stress column:"), slider_stress_col),
+            hgrid!(lab_strain_col, slider_strain_col),
+            hgrid!(lab_stress_col, slider_stress_col),
             hgrid!(Label(fig, "Strain multiplier:"), tb_strain_mult),
             hgrid!(Label(fig, "Stress multiplier"), tb_stress_mult),
             hgrid!(btn_clean, btn_done),
@@ -91,6 +94,8 @@ function data_gui(parent_screen::GLMakie.Screen , #GLFW screen to be able to clo
             stress_col = i==1 ? other_slider.value[] : val
             update_Imported!(Imported; strain_col, stress_col)
             update_data_plot!(ax_plot, Imported[:extracted], Imported[:abnormal_indices])
+            lab_strain_col.text = "Strain column: $strain_col"
+            lab_stress_col.text = "Stress column: $stress_col"
         end
     end
     
