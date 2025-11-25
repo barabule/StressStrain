@@ -81,10 +81,11 @@ function main(data = nothing;
             :export_format_ext => ".csv",
             :export_folder => export_folder, #where to export
             :export_density => 100, #how many points to export
+            :export_px_per_unit => 2, #plot output resolution scaling
             # plot
             :figure => fig,
             :axis => axss,   
-            :plot_rawdata => false, #plot the rawdata ?
+            :plot_rawdata => true, #plot the rawdata ?
             :plot_modulus => true, #plot E modulus line ?
             :plot_elastic_range =>true, #plot the elastic range ?
             :plot_base_data => true, #plot the base data ?
@@ -94,12 +95,10 @@ function main(data = nothing;
             :plot_hardening_offset => true,  #plot the hardening offset line ?
             :plot_cutoff_limits => true,  #plot the toein and cutoff vlines ?
             :plot_density => N, #how many points to plot 
-            :plot_px_per_unit => 2, #plot output resolution scaling
             :plot_format => :png,        
-            
     )
 
-    # update_stress_plot!(axss, SSE; N)
+    
     recompute_data!(CURVEDATA)
     update_stress_plot(CURVEDATA)
 
@@ -187,7 +186,7 @@ function main(data = nothing;
         println(f1)
         
         data_gui(screen, f1)
-        update_stress_plot!(CURVEDATA)
+        update_stress_plot(CURVEDATA)
     end
 
 
@@ -199,7 +198,7 @@ function main(data = nothing;
         recompute_data!(CURVEDATA)
         
         update_modulus_slider!(sld_modulus, CURVEDATA)
-        update_stress_plot!(CURVEDATA)
+        update_stress_plot(CURVEDATA)
         update_status_label!(CURVEDATA)
     end
 
@@ -406,11 +405,11 @@ function recompute_data!(D::Dict{Symbol, Any})
     D[:true_stress] = cutoff(TS, D[:cutoff])
 
     #5. compute E modulus
-    if D[:recompute_modulus] 
+    if D[:recompute_modulus] && !D[:is_fixed_modulus]
         
-        D[:e_modulus] = D[:is_fixed_modulus] ? D[:e_modulus] : 
-                            get_modulus(D[:true_stress];
+        D[:e_modulus] = get_modulus(D[:true_stress];
                                         max_strain = D[:max_elastic_range])
+        
     end
     
     #6. RambergOsgood 
@@ -514,6 +513,7 @@ function export_data(D::Dict{Symbol, Any})
 
     true_stress = D[:true_stress]
     delim = D[:export_format_delim]
+    px_per_unit = D[:export_px_per_unit]
 
     hardening_func = D[:hardening_fitter]
     tmax = D[:max_plastic_strain]
@@ -777,15 +777,16 @@ function draw_emodulus_controls!(fig::Figure, Lay::GridLayout, D::Dict{Symbol, A
 
 #########BEHAVIOR ####################################################################
     on(sld_modulus.value) do val
-        
-        D[:e_modulus] = round(val; sigdigits =3)
-        D[:recompute_modulus] = false
-        recompute_data!(D)
-        D[:recompute_modulus] = true
-        
-        update_stress_plot(D)
-        tb_modulus.displayed_string = "$(round(sld_modulus.value[]; sigdigits= 3))"
-        update_status_label!(D)
+        if !D[:is_fixed_modulus]
+            D[:e_modulus] = round(val; sigdigits =3)
+            D[:recompute_modulus] = false
+            recompute_data!(D)
+            D[:recompute_modulus] = true
+            
+            update_stress_plot(D)
+            tb_modulus.displayed_string = "$(round(sld_modulus.value[]; sigdigits= 3))"
+            update_status_label!(D)
+        end
     end
 
     on(sld_elastic_range.value) do val
@@ -799,7 +800,7 @@ function draw_emodulus_controls!(fig::Figure, Lay::GridLayout, D::Dict{Symbol, A
 
     on(tb_modulus.stored_string) do s
         #update modulus only in the checkbox is unchecked
-        if !cb_fixed.checked[]
+        if !D[:is_fixed_modulus]
             modulus = round(parse(Float64, s); sigdigits = 3)
             # update_SSE!(SSE; modulus)
             D[:e_modulus] = modulus
@@ -881,7 +882,7 @@ function draw_hardening_controls!(fig::Figure, Lay::GridLayout, D::Dict{Symbol, 
         
         # SSE["export max strain"] = clamp(parse(Float64, s), last(SSE["hardening"].strain), Inf)
         D[:max_plastic_strain] = clamp(parse(Float64, s), last(D[:hardening_portion].strain), Inf)
-        # update_stress_plot!(axss, SSE; N)
+       
         update_stress_plot(D)
         update_status_label!(D)
         
@@ -921,7 +922,7 @@ function draw_export_controls!(fig::Figure, Lay::GridLayout, D::Dict{Symbol, Any
     on(btn_export.clicks) do _
         D[:export_true_stress] = cb_exp_true.checked[]
         D[:export_hardening] = cb_exp_hardening.checked[]
-        D[:export_plot]  = cb_exp_plot.checke[]
+        D[:export_plot]  = cb_exp_plot.checked[]
         export_data(D)
 
     end

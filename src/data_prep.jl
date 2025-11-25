@@ -37,10 +37,10 @@ function get_modulus(SS;
     else
         E = (SS.stress[2] - SS.stress[1]) / ( SS.strain[2] - SS.strain[1]) #fallback
     end
-
+     
     Emin, Emax = bracket_modulus(SS)
     E = clamp(E, Emin, Emax)
-    
+    @assert isfinite(E)
     return round(E; sigdigits)
 end
 
@@ -56,10 +56,14 @@ function bracket_modulus(data;
         # ϵ <= 0 || σ <= 0 && continue #ignore invalid data
         slp = σ / ϵ #secant modulus
         slp <=0 && continue 
-        Emin = slp < Emin ? slp : Emin
-        Emax = slp > Emax ? slp : Emax
+        
+        if isfinite(slp)
+            Emin = slp < Emin ? slp : Emin
+            Emax = slp > Emax ? slp : Emax
+        end
     end
-    @assert Emin > 0 && Emax > 0
+    # @info "Emin", Emin, "Emax", Emax
+    @assert Emin > 0 && Emax > 0 && isfinite(Emin) && isfinite(Emax)
     return (;Emin = round(Emin; sigdigits), 
              Emax = round(Emax; sigdigits))
 end
