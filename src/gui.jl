@@ -106,58 +106,22 @@ function main(data = nothing;
                         # tellheight = false, tellwidth = false, 
                         alignmode = Outside(10))
 
+    ################# BLOCKS ###########################################################################################
 
-    ############## Overview ############################################################################################
-
-    
-    overview_controls = GridLayout()
-    draw_overview_controls!(fig, overview_controls, CURVEDATA)
-    make_button_block!(overview_gl, overview_controls; 
-                    btn_label = "Overview", 
-                    btn_width = CURVEDATA[:sidebar_sub_width]/3,
-                    )
-
-
-    ############### True Stress ########################################################################################
-
-    true_stress_controls = GridLayout()
-    draw_true_stress_controls!(fig, true_stress_controls, CURVEDATA)
-    make_button_block!(true_stress_gl, true_stress_controls;
-                            btn_label = "True Stress",
+    for (gl_block, draw_controls!, btn_label) in (
+                                    (overview_gl, draw_overview_controls!, "Overview"),
+                                    (true_stress_gl, draw_true_stress_controls!, "True Stress"),
+                                    (emod_gl, draw_emodulus_controls!, "E modulus"),
+                                    (hardening_gl, draw_hardening_controls!, "Hardening"),
+                                    (export_gl, draw_export_controls!, "Export"),
+                                    )
+        controls = GridLayout()
+        draw_controls!(fig, controls, CURVEDATA)
+        make_button_block!(gl_block, controls;
+                            btn_label,
                             btn_width = CURVEDATA[:sidebar_sub_width]/3)
 
-
-    ############## Emod ################################################################################################
-    
-
-    emodulus_controls = GridLayout()
-    draw_emodulus_controls!(fig, emodulus_controls, CURVEDATA)
-    make_button_block!(emod_gl, emodulus_controls;
-                    btn_label = "E Modulus",
-                    btn_width = CURVEDATA[:sidebar_sub_width]/3)
-
-
-    
-    ################ Hardening #########################################################################################
-
-    hardening_controls = GridLayout()
-    draw_hardening_controls!(fig, hardening_controls, CURVEDATA)
-    make_button_block!(hardening_gl, hardening_controls;
-                        btn_label = "Hardening",
-                        btn_width = CURVEDATA[:sidebar_sub_width]/3)
-
-
-
-    ################### Export Panel ###################################################################################
-
-    export_controls = GridLayout()
-    draw_export_controls!(fig, export_controls, CURVEDATA)
-    make_button_block!(export_gl, export_controls;
-                btn_label = "Export",
-                btn_width =CURVEDATA[:sidebar_sub_width]/3)
-
-    
-
+    end
 
     ################## Bottom Panel ####################################################################################
 
