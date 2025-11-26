@@ -18,7 +18,8 @@ function data_gui(parent_screen::GLMakie.Screen , #GLFW screen to be able to clo
     end
 
     initial_data = (;strain = DF[:,1], 
-                            stress = DF[:,2])
+                            stress = DF[:,2],
+                            folder = dirname(fn))
 
     #global data store
     Imported = Dict{Symbol, Any}( :DataFrame => DF,
