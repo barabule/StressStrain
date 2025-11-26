@@ -576,7 +576,8 @@ function draw_overview_controls!(Lay::GridLayout, D::Dict{Symbol, Any})
              boxcolor = :white)
 
     Lay[1, 1] = vgrid!(
-                            hgrid!(cb_true_stress, Label(fig, "True"), halign = :left),
+                            Label(fig, "Basic properties", font=:italic, fontsize = 12, halign= :left),
+                            hgrid!(cb_true_stress, Label(fig, "Data is true stress"), halign = :left),
                             # Label(fig, "Material Name", halign = :left),
                             tb_name,
                         )
@@ -638,6 +639,7 @@ function draw_true_stress_controls!(Lay::GridLayout, D::Dict{Symbol, Any})
                                         label = "BSpline num pts: ")
 
     Lay[1,1] = vgrid!(
+                    Label(fig, "Resample true stress", font=:italic, fontsize = 12, halign= :left),
                     Label(fig, "Resample Function", width = nothing),
                     hgrid!(resample_menu,),
                     bspline_deg_spinner, 
@@ -645,7 +647,8 @@ function draw_true_stress_controls!(Lay::GridLayout, D::Dict{Symbol, Any})
                     hgrid!(Label(fig, "Resample to  "), tb_resample),
                     hgrid!(btn_manual, btn_reset),
                     ;
-                    # tellheight = false, 
+                    # tellheight = false,
+                    halign = :left, 
                     width = D[:sidebar_sub_width],
 
     )
@@ -714,7 +717,9 @@ function draw_true_stress_controls!(Lay::GridLayout, D::Dict{Symbol, Any})
         D[:bspline_degree] = deg
         bspline_num_pts[] = clamp(bspline_num_pts[], bspline_degree[]+1, limits_bspline_num_pts[2])
         if D[:resampler] == BSplineApprox
+            D[:resample_base_data] = true
             recompute_data!(D)
+            D[:resample_base_data] = false
             update_stress_plot(D)
         end
         # @info "BSpline degree", D[:bspline_degree]
@@ -724,7 +729,9 @@ function draw_true_stress_controls!(Lay::GridLayout, D::Dict{Symbol, Any})
         num = clamp(num, D[:bspline_degree]+1, 100)
         D[:bspline_num_pts] = num
         if D[:resampler] == BSplineApprox
+            D[:resample_base_data] = true
             recompute_data!(D)
+            D[:resample_base_data] = false
             update_stress_plot(D)
         end
     end
@@ -783,6 +790,7 @@ function draw_emodulus_controls!(Lay::GridLayout, D::Dict{Symbol, Any})
     
 
     Lay[1, 1] = vgrid!(
+        Label(fig, "Modify E-modulus", font=:italic, fontsize = 12, halign= :left),
         hgrid!(lab_modulus, tb_modulus, Label(fig, "MPa")),
         sld_modulus,
         hgrid!(Label(fig, "Fix Modulus"), cb_fixed),
@@ -871,6 +879,7 @@ function draw_hardening_controls!(Lay::GridLayout, D::Dict{Symbol, Any})
     
 
     Lay[1, 1] = vgrid!(
+            Label(fig, "Change hardening curve fitting method.", font=:italic, fontsize = 12, halign= :left),
             hgrid!(Label(fig, "Method"), fit_menu),
             hgrid!(Label(fig, "Num Pts"), tb_hardening_pts),
             hgrid!(Label(fig, "Extrapolate strain to"), tb_extrapolation_strain),
@@ -930,10 +939,13 @@ function draw_export_controls!(Lay::GridLayout, D::Dict{Symbol, Any})
     cb_exp_plot = Checkbox(fig, checked = true)
 
     Lay[1,1] = vgrid!(
+                    Label(fig, "Export controls", font=:italic, fontsize = 12, halign= :left),
                     hgrid!(cb_exp_true, Label(fig, "True Stress"), halign = :left),
                     hgrid!(cb_exp_hardening, Label(fig, "Hardening"),halign = :left),
                     hgrid!(cb_exp_plot, Label(fig, "Plot"), halign = :left),
-                    btn_export,
+                    btn_export;
+                    halign = :left,
+                    width =D[:sidebar_sub_width],
                     )
 
     ########## BEHAVIOR #################
