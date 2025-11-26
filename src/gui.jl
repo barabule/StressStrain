@@ -209,6 +209,8 @@ function main(data = nothing;
 
     update_status_label!(CURVEDATA)
 
+    fig[0, :] = Label(fig, "Stress-Strain Fitter. Drop a file to import data.")
+
     screen = GLMakie.Screen()
     GLFW.SetWindowTitle(screen.glscreen, "Stress Strain Fitter")
     return display(screen, fig)
@@ -236,9 +238,10 @@ function update_stress_plot(D::Dict{Symbol, Any})
 
     if D[:plot_rawdata] #show very faintly
         RD = D[:rawdata]
-        scatter!(ax, RD.strain, RD.stress, 
-                color = (:grey90, 0.7),
+        scatterlines!(ax, RD.strain, RD.stress, 
+                color = (:grey90, 0.7), markercolor = (:grey90, 0.7),
                 markersize = 10,
+                linewidth = 1,
                 label = "Original Data",
                 )
     end
