@@ -246,6 +246,7 @@ function resample_curve(x, y, N::Integer=100;
         return resample(xii, yii, N;resampler = LinearInterpolation)
     elseif resampler == BSplineApprox
         interpolator = BSplineApprox(y, x, d, h, :ArcLen, :Average)
+        # @info "BSplineApprox", "d=", d, "h=", h
         return (xi, interpolator.(xi))
     elseif resampler == RegularizationSmooth
         xi, yi = resample_curve(x, y, N; resampler = LinearInterpolation)

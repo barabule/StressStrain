@@ -386,9 +386,11 @@ function recompute_data!(D::Dict{Symbol, Any})
         if resampler != RambergOsgood
             resampled_data = resample_curve(BD.strain, BD.stress, D[:resample_density];
                                             resampler,
+                                            d = D[:bspline_degree],
+                                            h = D[:bspline_num_pts],
                                             )
             
-            D[:base_data] => (;strain = resampled_data[1],
+            D[:base_data] = (;strain = resampled_data[1],
                             stress = resampled_data[2])
         end
 
@@ -708,13 +710,20 @@ function draw_true_stress_controls!(Lay::GridLayout, D::Dict{Symbol, Any})
         deg = clamp(deg, 3, 10)
         D[:bspline_degree] = deg
         bspline_num_pts[] = clamp(bspline_num_pts[], bspline_degree[]+1, limits_bspline_num_pts[2])
+        if D[:resampler] == BSplineApprox
+            recompute_data!(D)
+            update_stress_plot(D)
+        end
         # @info "BSpline degree", D[:bspline_degree]
     end
 
     on(bspline_num_pts) do num
         num = clamp(num, D[:bspline_degree]+1, 100)
         D[:bspline_num_pts] = num
-        # @info "BSpline number of pts ", D[:bspline_num_pts]
+        if D[:resampler] == BSplineApprox
+            recompute_data!(D)
+            update_stress_plot(D)
+        end
     end
     return nothing
 end
@@ -1014,9 +1023,6 @@ function make_spinner!(parent,
     # --- 1. Create a local GridLayout to hold the three elements tightly ---
     spinner_grid = layout[row, col] = GridLayout()
 
-    # --- 2. Create Elements ---
-
-    
     
     # Buttons: Use small, non-telling widths for compact appearance
     button_up   = Button(parent, label = "▲", tellwidth = false, tellheight = true, 
@@ -1030,18 +1036,14 @@ function make_spinner!(parent,
     spinner_grid[1, 2] = button_up
     spinner_grid[2, 2] = button_down
     
-    # CRITICAL: Eliminate the spacing between the up and down buttons to make them almost touch
-    rowgap!(spinner_grid, 1, 0) 
+    
+    rowgap!(spinner_grid, 1, 0) # CRITICAL: Eliminate the spacing between the up and down buttons to make them almost touch
     
     # Ensure the button rows are sized automatically
     rowsize!(spinner_grid, 1, Auto())
     rowsize!(spinner_grid, 2, Auto())
     
-    # --- 4. Internal Layout: Placing the Label ---
-    
-    # Place the label in the first column, spanning both rows
-    # spinner_grid[1:2, 1] = value_label
-    # Label: Displays the current value from the Observable
+   
     label_text = @lift(label * string($value_observable))
     value_label = Label(parent, label_text, 
                         tellwidth = true, 
@@ -1054,7 +1056,7 @@ function make_spinner!(parent,
     rowgap!(spinner_grid, 0)
     
     # Configure column sizes: Col 1 (Label) takes minimum width, Col 2 (Buttons) takes minimum width
-    colsize!(spinner_grid, 1, Auto())
+    #colsize!(spinner_grid, 1, Auto())
     colsize!(spinner_grid, 2, Auto())
 
     # --- 5. Wire the Logic ---
