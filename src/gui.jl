@@ -620,7 +620,7 @@ function draw_true_stress_controls!(Lay::GridLayout, D::Dict{Symbol, Any})
                     hgrid!(Label(fig, "Resample"), tb_resample),
                     hgrid!(btn_manual, btn_reset),
                     ;
-                    tellheight = false, 
+                    # tellheight = false, 
                     width = D[:sidebar_sub_width],
 
     )
@@ -847,7 +847,7 @@ function draw_hardening_controls!(Lay::GridLayout, D::Dict{Symbol, Any})
             hgrid!(Label(fig, "Extrapolate strain to"), tb_extrapolation_strain),
             ;
             halign = :left,
-            tellheight = false, 
+            # tellheight = false, 
             width = D[:sidebar_sub_width],
     )    
     ########### BEHAVIOR #############
@@ -966,7 +966,7 @@ function make_button_block!(main_GL::GridLayout, controls::GridLayout; #holds th
         if visible
             sub_GL[1,1] = controls
             hidden_GL[1,1] = empty_GL
-            rowsize!(main_GL, 2, Auto(false))
+            rowsize!(main_GL, 2, Auto(true))
         else 
             sub_GL[1,1] = empty_GL
             hidden_GL[1,1] = controls
