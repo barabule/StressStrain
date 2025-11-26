@@ -404,6 +404,7 @@ function recompute_data!(D::Dict{Symbol, Any})
         BD = toein_compensate(D[:base_data];
                             cut = D[:toein],
                             elastic_strain_offset = D[:max_elastic_range])
+        # @info "toein comp"
     else
         BD = D[:base_data]
     end

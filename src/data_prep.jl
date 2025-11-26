@@ -117,21 +117,17 @@ function toein_compensate(ss;
     
     #get the elastic portion of the cut curve
     elastic_strain_offset = clamp(elastic_strain_offset, 0, Inf)
-    islope = findlast( e -> e <= cut + elastic_strain_offset, ss.strain)
-       
-    if elastic_strain_offset ≈ 0 || (islope <= icut) #just get the next slope
-        next_slope = (ss.stress[icut+1] - ss.stress[icut]) / 
-                    (ss.strain[icut+1] - ss.strain[icut])
-    else
-        next_slope = get_modulus((;strain = view(ss.strain, icut:islope), 
-                                    stress = view(ss.stress, icut:islope));
-                                    max_strain = ss.stress[islope])
-    end
+    
 
-    next_slope = clamp(next_slope, min_slope, Inf) #no negative or zero slope allowed    
+    next_slope = (ss.stress[icut+1] - ss.stress[icut]) / 
+                    (ss.strain[icut+1] - ss.strain[icut])
+
+    
+    next_slope = max(next_slope, min_slope) #in case next slope is negative
+    
     el_strain = ss.stress[icut] / next_slope
     offset_strain = ss.strain[icut] - el_strain
-
+    # @info "offset strain", offset_strain
     strainout = ss.strain[icut:end] .- offset_strain
     stressout = ss.stress[icut:end]
     #add 0,0 as first point, only if there's no 0,0 point...
