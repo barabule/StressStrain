@@ -97,7 +97,11 @@ function main(data = nothing;
             :plot_hardening_offset => true,  #plot the hardening offset line ?
             :plot_cutoff_limits => true,  #plot the toein and cutoff vlines ?
             :plot_density => N, #how many points to plot 
-            :plot_format => :png,        
+            :plot_format => :png,  
+            # approx bspline params
+            :bspline_degree => 3,
+            :bspline_num_pts => 4,
+
     )
 
     
@@ -254,12 +258,14 @@ function update_stress_plot(D::Dict{Symbol, Any})
                         label= "True Stress (Exp)",
                         color = (:grey50, 0.5), marker = :diamond, 
                         markercolor = (:black, 0.5), 
-                        markersize = 20)
+                        markersize = 10)
     end
 
     if D[:plot_hardening_portion]
         HD = D[:hardening_portion]
         scatter!(ax, HD.strain, HD.stress,
+                    color = :red,
+                    markersize = 10,
                 )
     end
 
@@ -381,6 +387,7 @@ function recompute_data!(D::Dict{Symbol, Any})
             resampled_data = resample_curve(BD.strain, BD.stress, D[:resample_density];
                                             resampler,
                                             )
+            
             D[:base_data] => (;strain = resampled_data[1],
                             stress = resampled_data[2])
         end
@@ -415,7 +422,7 @@ function recompute_data!(D::Dict{Symbol, Any})
     if D[:resample_base_data] && D[:resampler] == RambergOsgood
         resampled_data = resample_curve(D[:true_stress].strain,
                                         D[:true_stress].stress,
-                                        length(D[:true_stess].strain);
+                                        length(D[:true_stress].strain); #optimization
                                         resampler = D[:resampler],
                                         offset = D[:hardening_offset],
                                         E = D[:e_modulus],
@@ -601,6 +608,7 @@ function draw_true_stress_controls!(Lay::GridLayout, D::Dict{Symbol, Any})
 
     tb_resample = Textbox(fig, placeholder = "Enter number",
                     validator = Int, tellwidth = false,
+                    width = D[:sidebar_sub_width]/4,
                     boxcolor = :white)
 
     btn_manual = Button(fig, label = "Manual")
@@ -609,15 +617,27 @@ function draw_true_stress_controls!(Lay::GridLayout, D::Dict{Symbol, Any})
     
     btn_reset = Button(fig, label = "Reset!")
 
-    btn_bspline_plus = Button(fig, label="+")
-    btn_bspline_minus = Button(fig, label = "-")
-    lab_bspline_control_pts = Label(fig, "4")
-
+    bspline_gl = GridLayout()
     
+    bspline_degree = Observable{Int}(3)
+    bspline_deg_gl = GridLayout()
+    bspline_deg_spinner = make_spinner!(fig, bspline_deg_gl, bspline_degree, 1, 1;
+                                        val_limits = (3, 10),
+                                        label = "BSpline degree: ")
+
+    bspline_num_pts = Observable{Int}(4)
+    bspline_num_pts_lo = @lift($bspline_degree  + 1)
+    limits_bspline_num_pts = (bspline_num_pts_lo, 100)
+    bspline_num_spinner = make_spinner!(fig, bspline_deg_gl, bspline_num_pts, 1, 2;
+                                        val_limits = limits_bspline_num_pts,
+                                        label = "BSpline num pts: ")
+
     Lay[1,1] = vgrid!(
                     Label(fig, "Resample Function", width = nothing),
-                    hgrid!(resample_menu, btn_bspline_plus, lab_bspline_control_pts, btn_bspline_minus),
-                    hgrid!(Label(fig, "Resample"), tb_resample),
+                    hgrid!(resample_menu,),
+                    bspline_deg_spinner, 
+                    bspline_num_spinner,
+                    hgrid!(Label(fig, "Resample to  "), tb_resample),
                     hgrid!(btn_manual, btn_reset),
                     ;
                     # tellheight = false, 
@@ -629,31 +649,16 @@ function draw_true_stress_controls!(Lay::GridLayout, D::Dict{Symbol, Any})
     on(resample_menu.selection) do s
         # #TODO better handling of modulus update when fitting on true stress
         D[:resampler] = s
-         D[:recompute_modulus] = false
+        D[:recompute_modulus] = false
+        D[:resample_base_data] = true
         recompute_data!(D)
         D[:recompute_modulus] = true
+        D[:resample_base_data] = false
         update_stress_plot(D)
         update_status_label!(D)
+        
     end
-    on(btn_bspline_plus.clicks) do _
-        # nc = SSE["BSpline approximation knots"]
-        # nc += 1
-        # SSE["BSpline approximation knots"] = nc
-        # lab_bspline_control_pts.text = string(nc)
-        # update_SSE!(SSE)
-        # update_stress_plot!(axss, SSE)
-        # update_status_label!(label_status, SSE)
-    end
-
-    on(btn_bspline_minus.clicks) do _ 
-        # nc = SSE["BSpline approximation knots"]
-        # nc = max(4, nc - 1)
-        # SSE["BSpline approximation knots"] = nc
-        # lab_bspline_control_pts.text = string(nc)
-        # update_SSE!(SSE)
-        # update_stress_plot!(axss, SSE)
-        # update_status_label!(label_status, SSE)
-    end
+    
 
     on(tb_resample.stored_string) do s
         
@@ -699,6 +704,18 @@ function draw_true_stress_controls!(Lay::GridLayout, D::Dict{Symbol, Any})
         update_stress_plot(D)
     end
 
+    on(bspline_degree) do deg
+        deg = clamp(deg, 3, 10)
+        D[:bspline_degree] = deg
+        bspline_num_pts[] = clamp(bspline_num_pts[], bspline_degree[]+1, limits_bspline_num_pts[2])
+        # @info "BSpline degree", D[:bspline_degree]
+    end
+
+    on(bspline_num_pts) do num
+        num = clamp(num, D[:bspline_degree]+1, 100)
+        D[:bspline_num_pts] = num
+        # @info "BSpline number of pts ", D[:bspline_num_pts]
+    end
     return nothing
 end
 
@@ -981,4 +998,82 @@ function initialize_axis(fig)
 return Axis(fig[1,1], title = "Stress Strain",
                     xlabel = "True Strain [-]",
                     ylabel = "True Stress [MPa]")
+end
+
+
+function make_spinner!(parent,
+                    layout::GridLayout, 
+                    value_observable::Observable{Int}, 
+                    row::Int, 
+                    col::Int;
+                    btn_size = 15,
+                    val_limits = (0, 40),
+                    label = "Value: ",
+                    )
+    
+    # --- 1. Create a local GridLayout to hold the three elements tightly ---
+    spinner_grid = layout[row, col] = GridLayout()
+
+    # --- 2. Create Elements ---
+
+    
+    
+    # Buttons: Use small, non-telling widths for compact appearance
+    button_up   = Button(parent, label = "▲", tellwidth = false, tellheight = true, 
+                                width = btn_size, height = btn_size)
+    button_down = Button(parent, label = "▼", tellwidth = false, tellheight = true,
+                                width = btn_size, height = btn_size)
+
+    # --- 3. Internal Layout: Grouping the Buttons ---
+    
+    # Place the buttons into the rows of the spinner_grid (column 2)
+    spinner_grid[1, 2] = button_up
+    spinner_grid[2, 2] = button_down
+    
+    # CRITICAL: Eliminate the spacing between the up and down buttons to make them almost touch
+    rowgap!(spinner_grid, 1, 0) 
+    
+    # Ensure the button rows are sized automatically
+    rowsize!(spinner_grid, 1, Auto())
+    rowsize!(spinner_grid, 2, Auto())
+    
+    # --- 4. Internal Layout: Placing the Label ---
+    
+    # Place the label in the first column, spanning both rows
+    # spinner_grid[1:2, 1] = value_label
+    # Label: Displays the current value from the Observable
+    label_text = @lift(label * string($value_observable))
+    value_label = Label(parent, label_text, 
+                        tellwidth = true, 
+                        tellheight = true, 
+                        halign = :left,
+                        padding = (5, 5, 5, 5)) # Add some padding around the text
+    spinner_grid[1:2, 1] = value_label
+
+    # Set the horizontal gap between the label and the buttons to zero
+    rowgap!(spinner_grid, 0)
+    
+    # Configure column sizes: Col 1 (Label) takes minimum width, Col 2 (Buttons) takes minimum width
+    colsize!(spinner_grid, 1, Auto())
+    colsize!(spinner_grid, 2, Auto())
+
+    # --- 5. Wire the Logic ---
+
+    # Increment logic
+    on(button_up.clicks) do _
+        v = value_observable[] + 1
+        lo = isa(val_limits[1], Observable) ? val_limits[1][] : val_limits[1]
+        hi = isa(val_limits[2], Observable) ? val_limits[1][] : val_limits[2]
+        value_observable[] = Int(clamp(v, lo, hi))
+    end
+
+    # Decrement logic
+    on(button_down.clicks) do _
+        v = value_observable[] - 1
+        lo = isa(val_limits[1], Observable) ? val_limits[1][] : val_limits[1]
+        hi = isa(val_limits[2], Observable) ? val_limits[1][] : val_limits[2]
+        value_observable[] = Int(clamp(v, lo, hi))
+    end
+
+    return spinner_grid
 end
