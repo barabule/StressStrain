@@ -2,7 +2,7 @@
 
 julia_version = "1.12.2"
 manifest_format = "2.0"
-project_hash = "e5232a732129e13e5c164fc1fd441b0d70a11620"
+project_hash = "4c335e64ff0b644e998f78366d927e63d863df15"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "8be2ae325471fc20b11c27bb34b518541d07dd3a"
@@ -1602,10 +1602,10 @@ weakdeps = ["ChainRulesCore", "InverseFunctions"]
     StatsFunsInverseFunctionsExt = "InverseFunctions"
 
 [[deps.StressStrain]]
-deps = ["DataInterpolations", "DelimitedFiles", "GLMakie", "LinearAlgebra", "Observables", "Optim", "RegularizationTools", "StaticArrays"]
+deps = ["CSV", "DataFrames", "DataInterpolations", "DelimitedFiles", "GLMakie", "LinearAlgebra", "Observables", "Optim", "RegularizationTools", "StaticArrays"]
 path = "."
 uuid = "35c0c9d5-9623-45a6-a87f-5a655e412bc9"
-version = "0.2.0"
+version = "0.3.0"
 
 [[deps.StringManipulation]]
 deps = ["PrecompileTools"]

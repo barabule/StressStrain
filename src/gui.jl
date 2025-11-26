@@ -239,7 +239,7 @@ function update_stress_plot(D::Dict{Symbol, Any})
     if D[:plot_rawdata] #show very faintly
         RD = D[:rawdata]
         scatterlines!(ax, RD.strain, RD.stress, 
-                color = (:grey90, 0.7), markercolor = (:grey90, 0.7),
+                color = (:grey60, 0.7), markercolor = (:grey60, 0.7),
                 markersize = 10,
                 linewidth = 1,
                 label = "Original Data",

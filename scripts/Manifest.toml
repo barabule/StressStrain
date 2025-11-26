@@ -1602,10 +1602,10 @@ weakdeps = ["ChainRulesCore", "InverseFunctions"]
     StatsFunsInverseFunctionsExt = "InverseFunctions"
 
 [[deps.StressStrain]]
-deps = ["CSV", "DataFrames", "DataInterpolations", "DelimitedFiles", "GLMakie", "LinearAlgebra", "Observables", "Optim", "RegularizationTools", "StaticArrays"]
+deps = ["CSV", "DataFrames", "DataInterpolations", "DelimitedFiles", "GLMakie", "LinearAlgebra", "Observables", "Optim", "PrecompileTools", "RegularizationTools", "StaticArrays"]
 path = ".."
 uuid = "35c0c9d5-9623-45a6-a87f-5a655e412bc9"
-version = "0.2.0"
+version = "0.3.0"
 
 [[deps.StringManipulation]]
 deps = ["PrecompileTools"]
