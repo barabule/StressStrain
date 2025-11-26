@@ -1,6 +1,6 @@
 name = "StressStrain"
 uuid = "35c0c9d5-9623-45a6-a87f-5a655e412bc9"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Werner Zanzinger <werner.zanzinger@gmail.com>"]
 
 [deps]
