@@ -1,6 +1,6 @@
 
 
-function main(data = nothing; 
+function launch_gui(data = nothing; 
                 clean_data = true, #if called directly with some data
                 N=1000,
                 sidebar_width = 300,
@@ -683,7 +683,7 @@ function draw_true_stress_controls!(Lay::GridLayout, D::Dict{Symbol, Any})
 
     on(btn_manual.clicks) do _
         # #open a new window, do the fitting,
-        # #then close the main window and restart with new data
+        # #then close the launch_gui window and restart with new data
         # handle_bezier_fit(SSE, screen)
         @async begin
             @info "Opening Bezier Fitting Window"

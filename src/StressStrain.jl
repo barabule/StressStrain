@@ -14,7 +14,7 @@ include("bezier.jl")
 include("data_gui.jl")
 include("gui.jl")
 
-export main
+export launch_gui
 export engineering_to_true, true_to_engineering
 export get_modulus
 export get_hardening_portion

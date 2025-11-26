@@ -2,6 +2,7 @@
 Simple stress-strain and hardening curve fitting in Julia. Mainly intended for metals/ elasto-plastic materials.
 
 # Installation
+Julia needs to be installed on your computer.
 
 Make a new empty folder and open Julia into it (or navigate via cd("path/to/folder") in Julia).
 Then open the package promp with ']' and type:
@@ -19,7 +20,7 @@ After installation finishes, exit package mode (with Backspace) and type:
 
 Type 
 ```
-    main()
+    launch_gui()
 ```
  to start the main GUI:
 
@@ -28,20 +29,20 @@ Type
 It's best to maximize the window.
 
 
-Alternatively you can already add the 'data' argument to main:
+Alternatively you can already add the 'data' argument to launch_gui:
 ```
     data = (;strain = ..., stress = ...) #data needs the strain and stress fields
-    main(data)
+    launch_gui(data)
 
 ```
 
-You can drag and drop a file onto the main window and am import subwindow will appear:
+You can drag and drop a file onto the launch_gui window and an import subwindow will appear:
 
 <img src = "/assets/import_GUI.png" width = "300" align = "Center">
 
 After changing the textbox defaults, click on Import! and a plot should appear.
 Red point indicate abnormal points, which you can exclude by clicking on Clean!.
-After you're satisfied with the data click on Done! and the main window with open the new data, 
+After you're satisfied with the data click on Done! and the launch_gui window with open the new data, 
 closing the import window.
 
 The controls are grouped into several categories:
@@ -49,15 +50,14 @@ The controls are grouped into several categories:
 On the bottom is a slider with 2 values: toein and cut off.
 *Toein is meant to eliminate the soft portion at the start of the stress strain curve where the slope
 is too small due to insufficient clamping etc at the start of the measurement.
-*Cutoff cut off the last portion of the true stress curve to not  use it for fitting the hardening 
+*Cutoff -> cuts off the last portion of the true stress curve to not  use it for fitting the hardening 
 portion. In general a hardening curve for metals should not have non-monotonic rising portions, 
 with this option you can eliminate segments from the hardening portion that would make a worse fit to
-the data.
+the data. Usually this is done for the damage portion (softening) on the end of the curve.
 
 Both values can be reset non-destructively.
 ## Overview
-Change the material name and check if your data is true stress (checked) or 
-engineering stress (unchecked).
+Change the material name and check if your data is true stress (checked) or engineering stress (unchecked).
 
 ## True Stress Curve
 Here you can resample the true stress function by several methods and also change the number of points.

@@ -140,7 +140,7 @@ function data_gui(parent_screen::GLMakie.Screen , #GLFW screen to be able to clo
             close(parent_screen)
             
 
-            main(Imported[:extracted];
+            launch_gui(Imported[:extracted];
                 clean_data = false,
                 )
             
@@ -148,7 +148,6 @@ function data_gui(parent_screen::GLMakie.Screen , #GLFW screen to be able to clo
 
     end
 
-    
     
     display(screen, fig)
 end
