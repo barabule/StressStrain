@@ -920,6 +920,7 @@ function draw_hardening_controls!(Lay::GridLayout, D::Dict{Symbol, Any})
         num_hardening_pts = Int(clamp(parse(Int, s), 2, Inf))
         # SSE["export density"] = num_hardening_pts
         D[:export_density] = num_hardening_pts
+        #block change of modulus, only hardening resampling should be changed
         recompute_data!(D)
         update_stress_plot(D)
     end

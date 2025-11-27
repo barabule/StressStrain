@@ -80,7 +80,14 @@ function bezier_fit_fig(results::Ref{Dict{String, Any}};
     lines!(ax, cpoints, color = (:grey, 0.5), linestyle = :dash, label = "Control Polygon")
 
     #control pts
-    scatter_plot = scatter!(ax, cpoints, markersize = 15, color = :red, strokecolor = :black, strokewidth = 1, marker = :circle, label = "Control Points")
+    ctrl_colors = @lift map(i -> is_main_vertex($cpoints, i) ? :red : :grey50, eachindex($cpoints))
+    scatter_plot = scatter!(ax, cpoints, 
+                            markersize = 15, 
+                            color = ctrl_colors, 
+                            strokecolor = :black, 
+                            strokewidth = 1, 
+                            marker = :circle, 
+                            label = "Control Points")
 
     # --- 3. Interactivity: Dragging Control Points ---
     # Find the index of the closest control point when the mouse is pressed
