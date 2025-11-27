@@ -93,8 +93,19 @@ function get_hardening_portion(SS, modulus = nothing;offset = 2e-3)
     #this is sometimes needed for noisy data
     sorted_idx = sortperm(plastic_strain)
 
-    return (;strain =  plastic_strain[sorted_idx],
-            stress = effective_stress[sorted_idx])
+    #happy
+    strain = plastic_strain[sorted_idx]
+    stress = effective_stress[sorted_idx]
+
+    if length(strain) <2 #too short -> fallback to the extrapolated SS slope
+        emax = last(SS.strain)
+        strain = [0.0, emax] #arbitrary
+        sbef, smax = SS.stress[end-1 : end]
+        last_slope = max(0.0, (smax - sbef) / emax)
+        stress = [smax, smax + emax * last_slope ]
+    end
+
+    return (;strain , stress)
 end
 
 

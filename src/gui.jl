@@ -444,6 +444,8 @@ function recompute_data!(D::Dict{Symbol, Any})
                                                     D[:e_modulus];
                                                     offset = D[:hardening_offset],
                                                     )
+        
+
     end
     # for plot /export 
     D[:max_plastic_strain] = max(D[:max_plastic_strain], last(D[:hardening_portion].strain))
@@ -451,13 +453,6 @@ function recompute_data!(D::Dict{Symbol, Any})
     #8. update allowable elastic range
     D[:max_elastic_range] = last(D[:true_stress].strain)
     
-
-    # if isnothing(SSE["hardening"]) #how to handle this gracefully
-    #     @warn "Hardening portion cannot be extracted!"
-    #     @info "Modulus ", SSE["modulus"]
-    #     @info "Hardening offset ", SSE["hardening offset"]
-        
-    # end
     #9. hardening fit
     if D[:recompute_hardening_fit]
         D[:hardening_fitter] = make_interpolant(D[:hardening_interpolant], D[:hardening_portion]; alg = D[:alg]) 
@@ -920,8 +915,8 @@ function draw_hardening_controls!(Lay::GridLayout, D::Dict{Symbol, Any})
         num_hardening_pts = Int(clamp(parse(Int, s), 2, Inf))
         # SSE["export density"] = num_hardening_pts
         D[:export_density] = num_hardening_pts
-        #block change of modulus, only hardening resampling should be changed
-        recompute_data!(D)
+        # #block change of modulus, only hardening resampling should be changed
+        # recompute_data!(D)
         update_stress_plot(D)
     end
 
