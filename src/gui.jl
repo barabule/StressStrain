@@ -7,6 +7,7 @@ function launch_gui(data = nothing;
                 bottom_panel_height = 100,
                 subscale = 0.9,
                 alg = NelderMead(),
+                precompile_run = false, #only used when precompile run to close window
                 )
 
     #the default 'data'
@@ -213,6 +214,9 @@ function launch_gui(data = nothing;
 
     screen = GLMakie.Screen()
     GLFW.SetWindowTitle(screen.glscreen, "Stress Strain Fitter")
+    if precompile_run
+        return display(screen, fig)
+    end
     return wait(display(screen, fig)) #to not directly close the window after opening by script
 
 end

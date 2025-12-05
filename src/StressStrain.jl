@@ -25,8 +25,8 @@ export read_stress_strain_data
 @setup_workload begin
     
     @compile_workload begin
-        launch_gui()
-        GLMakie.closeall()
+        launch_gui(; precompile_run = true) #auto closes
+        
     end
 end
 
