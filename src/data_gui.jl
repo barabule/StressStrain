@@ -140,9 +140,10 @@ function data_gui(parent_screen::GLMakie.Screen , #GLFW screen to be able to clo
             #probably the cleanest
             close(parent_screen)
             
-
+            new_screen = GLMakie.Screen(;title = "Stress Strain Fitter")
             launch_gui(Imported[:extracted];
                 clean_data = false,
+                screen = new_screen,
                 )
             
         end

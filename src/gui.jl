@@ -8,6 +8,7 @@ function launch_gui(data = nothing;
                 subscale = 0.9,
                 alg = NelderMead(),
                 precompile_run = false, #only used when precompile run to close window
+                screen = nothing::Union{Nothing, GLMakie.Screen} , #
                 )
 
     #the default 'data'
@@ -212,7 +213,8 @@ function launch_gui(data = nothing;
 
     fig[0, :] = Label(fig, "Stress-Strain Fitter. Drop a file to import data.")
 
-    screen = GLMakie.Screen()
+    screen = isnothing(screen) ? GLMakie.Screen() : screen
+    # @info typeof(screen)
     GLFW.SetWindowTitle(screen.glscreen, "Stress Strain Fitter")
     if precompile_run
         return display(screen, fig)
