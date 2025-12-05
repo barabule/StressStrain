@@ -213,7 +213,7 @@ function launch_gui(data = nothing;
 
     screen = GLMakie.Screen()
     GLFW.SetWindowTitle(screen.glscreen, "Stress Strain Fitter")
-    return display(screen, fig)
+    return wait(display(screen, fig)) #to not directly close the window after opening by script
 
 end
 
